@@ -1,0 +1,613 @@
+import * as BABYLON from '@babylonjs/core';
+import { WeaponTypes, WeaponUpgrades } from '../weapons/WeaponTypes.js';
+
+export class Player {
+    constructor(scene, inputManager) {
+        this.scene = scene;
+        this.inputManager = inputManager;
+
+        // Player stats
+        this.health = 100;
+        this.maxHealth = 100;
+        this.coins = 0;
+
+        // Weapon system
+        this.currentWeapon = 'SNIPER_RIFLE';
+        this.ownedWeapons = ['SNIPER_RIFLE'];
+        this.weaponUpgrades = {};
+        this.weaponStats = null;
+
+        // Initialize weapon stats
+        this.loadWeaponStats();
+
+        // Ammo (loaded from weapon stats)
+        this.currentAmmo = this.weaponStats.maxAmmo;
+        this.reserveAmmo = this.weaponStats.reserveAmmo;
+        this.maxAmmo = this.weaponStats.maxAmmo;
+
+        // Movement properties
+        this.moveSpeed = 4.0;
+        this.sprintSpeed = 7.0;
+        this.jumpForce = 5.0;
+        this.isGrounded = false;
+        this.velocity = new BABYLON.Vector3(0, 0, 0);
+
+        // Ladder climbing properties
+        this.isClimbingLadder = false;
+        this.ladderClimbSpeed = 5.0;
+        this.ladderTrigger = null;
+        this.ladderTopPosition = null;
+
+        // Camera properties
+        this.mouseSensitivity = 0.002;
+        this.cameraPitch = 0;
+        this.cameraYaw = 0;
+        this.normalFOV = 0.8;
+        this.isZooming = false;
+
+        // Shooting properties (loaded from weapon stats)
+        this.fireRate = this.weaponStats.fireRate;
+        this.damage = this.weaponStats.damage;
+        this.reloadTime = this.weaponStats.reloadTime;
+        this.lastShotTime = 0;
+        this.isReloading = false;
+        this.reloadTimer = 0;
+        this.shotQueued = false;
+
+        // References
+        this.mesh = null;
+        this.camera = null;
+        this.shootRay = null;
+
+        // Callbacks
+        this.onEnemyKilled = null;
+        this.onPlayerDeath = null;
+
+        // Stats tracking
+        this.enemiesKilled = 0;
+        this.isDead = false;
+    }
+
+    spawn(position) {
+        // Create player capsule (invisible in first-person, but useful for collision)
+        this.mesh = BABYLON.MeshBuilder.CreateCapsule('player', {
+            height: 1.8,
+            radius: 0.3
+        }, this.scene);
+        this.mesh.position = position;
+        this.mesh.checkCollisions = true;
+        this.mesh.ellipsoid = new BABYLON.Vector3(0.3, 0.9, 0.3);
+
+        // Make player invisible (third-person body could be added later)
+        this.mesh.visibility = 0;
+
+        // Create camera (first-person)
+        this.camera = new BABYLON.UniversalCamera('playerCamera',
+            new BABYLON.Vector3(0, 1.6, 0), this.scene);
+        this.camera.parent = this.mesh;
+        this.camera.minZ = 0.1;
+        this.camera.fov = this.normalFOV;
+        this.scene.activeCamera = this.camera;
+
+        // Set up camera collision
+        this.camera.checkCollisions = true;
+        this.camera.applyGravity = false; // We'll handle gravity manually
+
+        // Find ladder trigger and define top position
+        this.ladderTrigger = this.scene.getMeshByName('ladderTrigger');
+        if (this.ladderTrigger) {
+            const towerHeight = 15; // From LevelManager
+            this.ladderTopPosition = new BABYLON.Vector3(
+                this.ladderTrigger.position.x,
+                towerHeight + 1,
+                this.ladderTrigger.position.z - 0.5
+            );
+        }
+    }
+
+    update(deltaTime) {
+        if (!this.mesh || !this.camera) return;
+        if (this.isDead) return; // Don't update if dead
+
+        // Handle automated ladder climbing
+        if (this.isClimbingLadder) {
+            this.mesh.position.y += this.ladderClimbSpeed * deltaTime;
+            // Teleport to top position if reached
+            if (this.mesh.position.y >= this.ladderTopPosition.y) {
+                this.mesh.position = this.ladderTopPosition.clone();
+                this.isClimbingLadder = false;
+            }
+            return; // Skip all other updates while climbing
+        }
+
+        // Handle reloading
+        if (this.isReloading) {
+            this.reloadTimer += deltaTime;
+            if (this.reloadTimer >= this.reloadTime) {
+                this.finishReload();
+            }
+            return; // Can't do anything else while reloading
+        }
+
+        // Handle zoom/scope
+        this.updateZoom(deltaTime);
+
+        // Handle camera rotation
+        this.updateCamera(deltaTime);
+
+        // Handle movement
+        this.updateMovement(deltaTime);
+
+        // Apply gravity
+        this.applyGravity(deltaTime);
+
+        // Check if grounded
+        this.checkGrounded();
+    }
+
+    updateCamera(deltaTime) {
+        const mouseDelta = this.inputManager.getMouseDelta();
+
+        // Update yaw (left-right rotation)
+        this.cameraYaw -= mouseDelta.x * this.mouseSensitivity;
+
+        // Update pitch (up-down rotation)
+        this.cameraPitch -= mouseDelta.y * this.mouseSensitivity;
+        this.cameraPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.cameraPitch));
+
+        // Apply rotation to mesh (yaw)
+        this.mesh.rotation.y = this.cameraYaw;
+
+        // Apply rotation to camera (pitch)
+        this.camera.rotation.x = this.cameraPitch;
+    }
+
+    updateZoom(deltaTime) {
+        // Check if right mouse button is held
+        const isZoomButtonHeld = this.inputManager.isMouseButtonDown(2); // Right click
+
+        if (isZoomButtonHeld && !this.isZooming) {
+            // Start zooming and queue a shot
+            this.isZooming = true;
+            this.shotQueued = true;
+        } else if (!isZoomButtonHeld && this.isZooming) {
+            // Stop zooming and fire the queued shot
+            this.isZooming = false;
+            if (this.shotQueued) {
+                this.shoot();
+                this.shotQueued = false;
+            }
+        }
+
+        // Smoothly interpolate FOV
+        const targetFOV = this.isZooming ? this.weaponStats.zoomedFOV : this.normalFOV;
+        this.camera.fov += (targetFOV - this.camera.fov) * deltaTime * 10;
+    }
+
+    updateMovement(deltaTime) {
+        if (this.isClimbingLadder) return; // Disable movement while climbing
+
+        const input = this.inputManager.getMovementInput();
+
+        // Get current speed
+        const isSprinting = this.inputManager.isSprintPressed();
+        const speed = isSprinting ? this.sprintSpeed : this.moveSpeed;
+
+        // Calculate movement direction relative to camera
+        const forward = this.mesh.forward.scale(input.forward);
+        const right = this.mesh.right.scale(input.right);
+        const movement = forward.add(right);
+
+        if (movement.length() > 0) {
+            movement.normalize().scaleInPlace(speed * deltaTime);
+            this.mesh.moveWithCollisions(movement);
+        }
+
+        // Handle jump and ladder climb trigger
+        if (this.inputManager.isJumpPressed()) {
+            // Check for ladder climb
+            if (this.ladderTrigger && this.mesh.intersectsMesh(this.ladderTrigger, false)) {
+                this.isClimbingLadder = true;
+                this.velocity.y = 0; // Stop any falling momentum
+            }
+            // Handle normal jump
+            else if (this.isGrounded) {
+                this.velocity.y = this.jumpForce;
+                this.isGrounded = false;
+            }
+        }
+    }
+
+    applyGravity(deltaTime) {
+        if (this.isClimbingLadder) return; // Disable gravity while climbing
+
+        if (!this.isGrounded) {
+            this.velocity.y -= 9.81 * deltaTime;
+        } else {
+            this.velocity.y = 0;
+        }
+
+        const verticalMovement = new BABYLON.Vector3(0, this.velocity.y * deltaTime, 0);
+        this.mesh.moveWithCollisions(verticalMovement);
+    }
+
+    checkGrounded() {
+        // Simple ground check - raycast downward
+        const ray = new BABYLON.Ray(
+            this.mesh.position,
+            new BABYLON.Vector3(0, -1, 0),
+            0.95
+        );
+
+        const hit = this.scene.pickWithRay(ray, (mesh) => {
+            return mesh !== this.mesh && mesh.checkCollisions;
+        });
+
+        this.isGrounded = hit && hit.hit;
+    }
+
+    shoot() {
+        if (this.isReloading) return;
+        if (this.currentAmmo <= 0) {
+            this.reload();
+            return;
+        }
+
+        const now = performance.now() / 1000;
+        if (now - this.lastShotTime < this.fireRate) return;
+
+        this.lastShotTime = now;
+        this.currentAmmo--;
+
+        // Create muzzle flash particle effect
+        this.createMuzzleFlash();
+
+        // Create ray from camera center - use getDirection for accurate aiming
+        const origin = this.camera.globalPosition;
+        const forward = this.camera.getDirection(BABYLON.Vector3.Forward());
+
+        const ray = new BABYLON.Ray(origin, forward, 1000);
+
+        // Visualize the ray (for debugging)
+        const rayHelper = new BABYLON.RayHelper(ray);
+        rayHelper.show(this.scene, new BABYLON.Color3(1, 0, 0));
+        setTimeout(() => rayHelper.hide(), 50);
+
+        // Check for hits
+        const hit = this.scene.pickWithRay(ray, (mesh) => {
+            return mesh !== this.mesh && mesh.name.startsWith('enemy');
+        });
+
+        if (hit && hit.hit) {
+            console.log('Hit enemy:', hit.pickedMesh.name);
+
+            // Create bullet impact effect
+            this.createBulletImpact(hit.pickedPoint);
+
+            // Check if headshot
+            const isHeadshot = hit.pickedMesh.isHeadshot === true;
+
+            // Damage the enemy - check both the mesh and its parent
+            let enemyComponent = hit.pickedMesh.enemyComponent;
+
+            // If the mesh doesn't have the component, check its parent
+            if (!enemyComponent && hit.pickedMesh.parent) {
+                enemyComponent = hit.pickedMesh.parent.enemyComponent;
+            }
+
+            if (enemyComponent) {
+                const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
+
+                // Check if enemy died
+                if (!enemyComponent.alive) {
+                    this.enemiesKilled++;
+
+                    // Notify game about the kill (will be handled by callback)
+                    if (this.onEnemyKilled) {
+                        this.onEnemyKilled(wasHeadshot);
+                    }
+                }
+            } else {
+                console.log('No enemy component found on:', hit.pickedMesh.name);
+            }
+
+            // Handle explosive ammo
+            if (this.weaponStats.hasExplosiveAmmo) {
+                this.createExplosion(hit.pickedPoint);
+            }
+        } else if (this.weaponStats.hasExplosiveAmmo) {
+            // Even if we don't hit an enemy, create explosion at max range or terrain
+            const maxRangePoint = origin.add(forward.scale(1000));
+            const terrainHit = this.scene.pickWithRay(new BABYLON.Ray(origin, forward, 1000), (mesh) => {
+                return mesh.checkCollisions && !mesh.name.startsWith('enemy');
+            });
+
+            if (terrainHit && terrainHit.hit) {
+                this.createExplosion(terrainHit.pickedPoint);
+            }
+        }
+
+        // Auto-reload if empty
+        if (this.currentAmmo <= 0 && this.reserveAmmo > 0) {
+            this.reload();
+        }
+    }
+
+    createMuzzleFlash() {
+        // Create a simple particle system for muzzle flash
+        const particleSystem = new BABYLON.ParticleSystem("muzzleFlash", 50, this.scene);
+
+        // Position at camera (gun position)
+        const forward = this.camera.getDirection(BABYLON.Vector3.Forward());
+        const emitterPosition = this.camera.globalPosition.add(forward.scale(0.5));
+        particleSystem.emitter = emitterPosition;
+
+        // Particle appearance
+        particleSystem.particleTexture = new BABYLON.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", this.scene);
+
+        particleSystem.color1 = new BABYLON.Color4(1, 0.8, 0.2, 1.0);
+        particleSystem.color2 = new BABYLON.Color4(1, 0.5, 0, 1.0);
+        particleSystem.colorDead = new BABYLON.Color4(0.5, 0.3, 0, 0.0);
+
+        particleSystem.minSize = 0.1;
+        particleSystem.maxSize = 0.3;
+
+        particleSystem.minLifeTime = 0.05;
+        particleSystem.maxLifeTime = 0.1;
+
+        particleSystem.emitRate = 500;
+
+        // Direction
+        particleSystem.direction1 = forward.scale(2);
+        particleSystem.direction2 = forward.scale(3);
+
+        particleSystem.minEmitPower = 1;
+        particleSystem.maxEmitPower = 3;
+
+        particleSystem.updateSpeed = 0.01;
+
+        // Start and auto-stop
+        particleSystem.targetStopDuration = 0.05;
+        particleSystem.start();
+
+        setTimeout(() => {
+            particleSystem.dispose();
+        }, 200);
+    }
+
+    createBulletImpact(position) {
+        // Create particle system for bullet impact
+        const particleSystem = new BABYLON.ParticleSystem("bulletImpact", 30, this.scene);
+
+        particleSystem.emitter = position;
+
+        // Particle appearance
+        particleSystem.particleTexture = new BABYLON.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", this.scene);
+
+        particleSystem.color1 = new BABYLON.Color4(0.7, 0.7, 0.7, 1.0);
+        particleSystem.color2 = new BABYLON.Color4(0.5, 0.5, 0.5, 1.0);
+        particleSystem.colorDead = new BABYLON.Color4(0.3, 0.3, 0.3, 0.0);
+
+        particleSystem.minSize = 0.05;
+        particleSystem.maxSize = 0.15;
+
+        particleSystem.minLifeTime = 0.1;
+        particleSystem.maxLifeTime = 0.3;
+
+        particleSystem.emitRate = 300;
+
+        // Random directions (explosion-like)
+        particleSystem.minEmitBox = new BABYLON.Vector3(-0.1, -0.1, -0.1);
+        particleSystem.maxEmitBox = new BABYLON.Vector3(0.1, 0.1, 0.1);
+
+        particleSystem.minEmitPower = 1;
+        particleSystem.maxEmitPower = 3;
+
+        particleSystem.updateSpeed = 0.01;
+
+        particleSystem.gravity = new BABYLON.Vector3(0, -2, 0);
+
+        // Start and auto-stop
+        particleSystem.targetStopDuration = 0.1;
+        particleSystem.start();
+
+        setTimeout(() => {
+            particleSystem.dispose();
+        }, 400);
+    }
+
+    createExplosion(position) {
+        // Create explosion particle system
+        const particleSystem = new BABYLON.ParticleSystem("explosion", 100, this.scene);
+
+        particleSystem.emitter = position;
+
+        // Particle appearance
+        particleSystem.particleTexture = new BABYLON.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", this.scene);
+
+        particleSystem.color1 = new BABYLON.Color4(1, 0.5, 0, 1.0);
+        particleSystem.color2 = new BABYLON.Color4(1, 0.2, 0, 1.0);
+        particleSystem.colorDead = new BABYLON.Color4(0.3, 0.1, 0, 0.0);
+
+        particleSystem.minSize = 0.3;
+        particleSystem.maxSize = 0.8;
+
+        particleSystem.minLifeTime = 0.2;
+        particleSystem.maxLifeTime = 0.5;
+
+        particleSystem.emitRate = 500;
+
+        // Spherical explosion
+        particleSystem.createSphereEmitter(1);
+
+        particleSystem.minEmitPower = 5;
+        particleSystem.maxEmitPower = 10;
+
+        particleSystem.updateSpeed = 0.01;
+
+        particleSystem.gravity = new BABYLON.Vector3(0, -5, 0);
+
+        // Start and auto-stop
+        particleSystem.targetStopDuration = 0.2;
+        particleSystem.start();
+
+        setTimeout(() => {
+            particleSystem.dispose();
+        }, 700);
+
+        // Apply explosion damage to nearby enemies
+        const radius = this.weaponStats.explosiveRadius;
+        const explosiveDamage = this.weaponStats.explosiveDamage;
+
+        // Find all enemies in the scene
+        this.scene.meshes.forEach(mesh => {
+            if (mesh.name.startsWith('enemy') && mesh.enemyComponent) {
+                const enemyComponent = mesh.enemyComponent;
+                const distance = BABYLON.Vector3.Distance(position, mesh.getAbsolutePosition());
+                if (distance <= radius) {
+                    // Check if enemy was alive before damage
+                    const wasAlive = enemyComponent.alive;
+
+                    // Apply damage based on distance (closer = more damage)
+                    const damageFalloff = 1 - (distance / radius);
+                    const damage = Math.round(explosiveDamage * damageFalloff);
+                    enemyComponent.takeDamage(damage, false);
+                    console.log(`Explosion hit ${mesh.name} for ${damage} damage!`);
+
+                    // Check if enemy died from this explosion
+                    if (wasAlive && !enemyComponent.alive) {
+                        this.enemiesKilled++;
+
+                        // Award coins for explosive kill
+                        if (this.onEnemyKilled) {
+                            this.onEnemyKilled(false); // Not a headshot
+                        }
+                    }
+                }
+            }
+        });
+
+        console.log(`Explosion at ${position} with radius ${radius}!`);
+    }
+
+    reload() {
+        if (this.isReloading) return;
+        if (this.currentAmmo === this.maxAmmo) return;
+        if (this.reserveAmmo <= 0) return;
+
+        this.isReloading = true;
+        this.reloadTimer = 0;
+        console.log('Reloading...');
+    }
+
+    finishReload() {
+        const ammoNeeded = this.maxAmmo - this.currentAmmo;
+        const ammoToReload = Math.min(ammoNeeded, this.reserveAmmo);
+
+        this.currentAmmo += ammoToReload;
+        this.reserveAmmo -= ammoToReload;
+
+        this.isReloading = false;
+        console.log('Reload complete!');
+    }
+
+    takeDamage(amount) {
+        if (this.isDead) return;
+
+        this.health -= amount;
+        if (this.health <= 0) {
+            this.health = 0;
+            this.die();
+        }
+    }
+
+    die() {
+        console.log('Player died!');
+        this.isDead = true;
+
+        // Trigger death callback
+        if (this.onPlayerDeath) {
+            this.onPlayerDeath(this.coins, this.enemiesKilled);
+        }
+    }
+
+    respawn(position) {
+        // Reset player stats
+        this.health = this.maxHealth;
+        this.isDead = false;
+        this.enemiesKilled = 0;
+
+        // Reset ammo
+        this.currentAmmo = this.weaponStats.maxAmmo;
+        this.reserveAmmo = this.weaponStats.reserveAmmo;
+        this.isReloading = false;
+
+        // Reset position
+        if (this.mesh) {
+            this.mesh.position = position.clone();
+        }
+
+        // Reset camera rotation
+        this.cameraPitch = 0;
+        this.cameraYaw = 0;
+
+        console.log('Player respawned!');
+    }
+
+    addCoins(amount) {
+        this.coins += amount;
+        console.log(`+${amount} coins! Total: ${this.coins}`);
+    }
+
+    loadWeaponStats() {
+        // Load base weapon stats
+        const baseStats = WeaponTypes[this.currentWeapon];
+        this.weaponStats = { ...baseStats };
+        this.applyUpgrades();
+    }
+
+    applyUpgrades() {
+        if (!this.weaponStats) return;
+
+        // Reset to base stats
+        const baseStats = WeaponTypes[this.currentWeapon];
+        this.weaponStats = { ...baseStats };
+
+        // Apply upgrades
+        if (this.weaponUpgrades.DAMAGE) {
+            this.weaponStats.damage = Math.round(baseStats.damage * WeaponUpgrades.DAMAGE.damageMultiplier);
+        }
+        if (this.weaponUpgrades.FIRE_RATE) {
+            this.weaponStats.fireRate = baseStats.fireRate * WeaponUpgrades.FIRE_RATE.fireRateMultiplier;
+        }
+        if (this.weaponUpgrades.AMMO_CAPACITY) {
+            this.weaponStats.maxAmmo = Math.round(baseStats.maxAmmo * WeaponUpgrades.AMMO_CAPACITY.ammoMultiplier);
+            this.weaponStats.reserveAmmo = Math.round(baseStats.reserveAmmo * WeaponUpgrades.AMMO_CAPACITY.ammoMultiplier);
+        }
+        if (this.weaponUpgrades.RELOAD_SPEED) {
+            this.weaponStats.reloadTime = baseStats.reloadTime * WeaponUpgrades.RELOAD_SPEED.reloadTimeMultiplier;
+        }
+
+        // Update active stats
+        this.damage = this.weaponStats.damage;
+        this.fireRate = this.weaponStats.fireRate;
+        this.reloadTime = this.weaponStats.reloadTime;
+        this.maxAmmo = this.weaponStats.maxAmmo;
+    }
+
+    switchWeapon(weaponKey) {
+        if (!this.ownedWeapons.includes(weaponKey)) {
+            console.log("You don't own this weapon!");
+            return;
+        }
+
+        this.currentWeapon = weaponKey;
+        this.loadWeaponStats();
+
+        // Reload ammo for new weapon
+        this.currentAmmo = this.weaponStats.maxAmmo;
+        this.reserveAmmo = this.weaponStats.reserveAmmo;
+
+        console.log(`Switched to ${this.weaponStats.name}`);
+    }
+}

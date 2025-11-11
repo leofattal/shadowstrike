@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sniper Strike: Shadow Mission</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            outline: none;
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            color: white;
+            font-family: 'Courier New', monospace;
+        }
+
+        .hud-top-left {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+
+        .hud-top-right {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .hud-bottom-left {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+        }
+
+        .hud-bottom-right {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .hud-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .health-bar {
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid #ff0000;
+            width: 200px;
+            height: 20px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+
+        .health-fill {
+            background: linear-gradient(to right, #ff0000, #ff6600);
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        .ammo-display {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .scope-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, transparent 20%, rgba(0, 0, 0, 0.95) 20.5%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s;
+            z-index: 1000;
+        }
+
+        .scope-overlay.active {
+            opacity: 1;
+        }
+
+        /* High-quality sniper scope */
+        .scope-overlay.sniper {
+            background: radial-gradient(circle at center, transparent 0%, transparent 22%, rgba(0, 0, 0, 0.98) 22.5%);
+        }
+
+        .scope-overlay.sniper .scope-reticle::before,
+        .scope-overlay.sniper .scope-reticle::after {
+            background: rgba(0, 255, 0, 0.9);
+        }
+
+        .scope-overlay.sniper .scope-circle {
+            border: 2px solid rgba(0, 255, 0, 0.6);
+        }
+
+        /* Medium-quality scope for heavy weapons */
+        .scope-overlay.heavy {
+            background: radial-gradient(circle at center, transparent 0%, transparent 20%, rgba(0, 0, 0, 0.95) 20.5%);
+        }
+
+        .scope-overlay.heavy .scope-reticle::before,
+        .scope-overlay.heavy .scope-reticle::after {
+            background: rgba(255, 200, 0, 0.8);
+            width: 2px; /* Thicker than sniper */
+            height: 2px;
+        }
+
+        .scope-overlay.heavy .scope-reticle::before {
+            height: 100%;
+        }
+        .scope-overlay.heavy .scope-reticle::after {
+            width: 100%;
+        }
+
+
+        /* Basic rifle scope - no crosshair */
+        .scope-overlay.rifle {
+            background: radial-gradient(circle at center, transparent 0%, transparent 18%, rgba(0, 0, 0, 0.9) 18.5%);
+        }
+
+        .scope-overlay.rifle .scope-reticle::before,
+        .scope-overlay.rifle .scope-reticle::after {
+            background: transparent; /* Hide the cross lines */
+        }
+
+
+        /* Explosive weapons scope - no crosshair */
+        .scope-overlay.explosive {
+            background: radial-gradient(circle at center, transparent 0%, transparent 15%, rgba(0, 0, 0, 0.85) 15.5%);
+        }
+
+        .scope-overlay.explosive .scope-reticle::before,
+        .scope-overlay.explosive .scope-reticle::after {
+            background: transparent; /* Hide the cross lines */
+        }
+
+        .scope-reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+        }
+
+        .scope-reticle::before,
+        .scope-reticle::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .scope-reticle::before {
+            width: 1px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .scope-reticle::after {
+            width: 100%;
+            height: 1px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .scope-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .controls-info {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .controls-info h3 {
+            margin-bottom: 10px;
+            color: #ffcc00;
+        }
+
+        .shop-card.selected {
+            border: 2px solid #ffcc00 !important;
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+
+    <div id="hud">
+        <!-- Top Left: Health & Ammo -->
+        <div class="hud-top-left">
+            <div class="health-bar">
+                <div class="health-fill" id="healthFill"></div>
+            </div>
+            <div style="color: #00ff00; font-size: 14px;">HP: <span id="healthText">100</span>/100</div>
+            <div class="ammo-display" style="margin-top: 10px;">
+                <span id="ammoText">30/90</span>
+            </div>
+            <div style="margin-top: 10px; color: #ffcc00; font-size: 16px;">
+                 <span id="coinsText">0</span>
+            </div>
+        </div>
+
+        <!-- Top Right: Objective -->
+        <div class="hud-top-right">
+            <div style="background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 5px;">
+                <div style="color: #ffcc00; font-size: 12px;">OBJECTIVE</div>
+                <div id="objectiveText" style="font-size: 14px;">Eliminate all enemies</div>
+                <div style="margin-top: 5px; font-size: 12px;">
+                    Enemies: <span id="enemyCount">0</span>/0
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Crosshair -->
+        <div class="crosshair"></div>
+
+        <!-- Scope Overlay -->
+        <div class="scope-overlay" id="scopeOverlay">
+            <div class="scope-circle"></div>
+            <div class="scope-reticle"></div>
+        </div>
+
+        <!-- Bottom Left: Controls Info -->
+        <div class="controls-info">
+            <h3>CONTROLS</h3>
+            <div>WASD - Move</div>
+            <div>Mouse - Look/Aim</div>
+            <div>Right Click - Zoom Scope</div>
+            <div>Left Click - Shoot (release to fire when zoomed)</div>
+            <div>R - Reload</div>
+            <div>G - Spawn Wave (restores ammo)</div>
+            <div>B - Shop</div>
+            <div>Shift - Sprint</div>
+            <div>Space - Jump</div>
+        </div>
+
+        <!-- Bottom Right: Weapon Info & Spawn Wave Button -->
+        <div class="hud-bottom-right">
+            <div style="background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 5px;">
+                <div id="weaponName" style="font-size: 16px; color: #ffcc00;">ASSAULT RIFLE</div>
+                <div id="fireMode" style="font-size: 12px; margin-top: 5px;">AUTO</div>
+            </div>
+            <button id="spawnWaveBtn" style="
+                margin-top: 15px;
+                background: linear-gradient(to bottom, #00cc00, #008800);
+                border: 2px solid #00ff00;
+                color: white;
+                padding: 10px 20px;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+                transition: all 0.2s;
+            " onmouseover="this.style.boxShadow='0 0 20px rgba(0, 255, 0, 0.6)'"
+               onmouseout="this.style.boxShadow='0 0 10px rgba(0, 255, 0, 0.3)'">
+                🌊 SPAWN WAVE
+            </button>
+        </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="deathScreen" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 0, 0, 0.3);
+        display: none;
+        z-index: 3000;
+    ">
+        <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 4px solid #ff0000;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            font-family: 'Courier New', monospace;
+        ">
+            <h1 style="color: #ff0000; font-size: 48px; margin: 0 0 20px 0; text-shadow: 0 0 20px #ff0000;">YOU DIED</h1>
+            <div id="deathStats" style="font-size: 18px; margin: 20px 0; color: #ffcc00;"></div>
+            <button id="respawnBtn" style="
+                background: linear-gradient(to bottom, #cc0000, #880000);
+                border: 3px solid #ff0000;
+                color: white;
+                padding: 15px 40px;
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                border-radius: 8px;
+                margin-top: 20px;
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+                transition: all 0.2s;
+            " onmouseover="this.style.boxShadow='0 0 30px rgba(255, 0, 0, 0.8)'"
+               onmouseout="this.style.boxShadow='0 0 20px rgba(255, 0, 0, 0.5)'">
+                ♻️ RESPAWN LEVEL
+            </button>
+        </div>
+    </div>
+
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <div>Loading Sniper Strike...</div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
