@@ -587,6 +587,10 @@ export class Player {
         if (this.weaponUpgrades.RELOAD_SPEED) {
             this.weaponStats.reloadTime = baseStats.reloadTime * WeaponUpgrades.RELOAD_SPEED.reloadTimeMultiplier;
         }
+        if (this.weaponUpgrades.BLAST_RADIUS) {
+            this.weaponStats.explosiveRadius = baseStats.explosiveRadius * WeaponUpgrades.BLAST_RADIUS.radiusMultiplier;
+            this.weaponStats.explosiveDamage = Math.round(baseStats.explosiveDamage * WeaponUpgrades.BLAST_RADIUS.explosiveDamageMultiplier);
+        }
 
         // Update active stats
         this.damage = this.weaponStats.damage;

@@ -110,5 +110,11 @@ export const WeaponUpgrades = {
         name: 'Reload Speed Upgrade',
         cost: 200,
         reloadTimeMultiplier: 0.6
+    },
+    BLAST_RADIUS: {
+        name: 'Blast Radius Upgrade',
+        cost: 500,
+        radiusMultiplier: 1.5, // 50% larger explosion radius
+        explosiveDamageMultiplier: 1.2 // 20% more explosive damage
     }
 };

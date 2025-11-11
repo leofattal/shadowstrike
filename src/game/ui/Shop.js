@@ -133,6 +133,14 @@ export class Shop {
 
         // Add upgrades
         Object.entries(WeaponUpgrades).forEach(([key, upgrade]) => {
+            // Only show Blast Radius upgrade for explosive weapons
+            if (key === 'BLAST_RADIUS') {
+                const currentWeaponStats = WeaponTypes[this.player.currentWeapon];
+                if (!currentWeaponStats.hasExplosiveAmmo) {
+                    return; // Skip this upgrade for non-explosive weapons
+                }
+            }
+
             const upgradeCard = this.createUpgradeCard(key, upgrade);
             this.upgradesGrid.appendChild(upgradeCard);
             if (upgradeCard.querySelector('button')) {
@@ -252,8 +260,23 @@ export class Shop {
             text-align: center;
         `;
 
+        // Get upgrade description
+        let description = '';
+        if (upgradeKey === 'DAMAGE') {
+            description = `+${((upgrade.damageMultiplier - 1) * 100).toFixed(0)}% damage`;
+        } else if (upgradeKey === 'FIRE_RATE') {
+            description = `${((1 - upgrade.fireRateMultiplier) * 100).toFixed(0)}% faster`;
+        } else if (upgradeKey === 'AMMO_CAPACITY') {
+            description = `+${((upgrade.ammoMultiplier - 1) * 100).toFixed(0)}% ammo`;
+        } else if (upgradeKey === 'RELOAD_SPEED') {
+            description = `${((1 - upgrade.reloadTimeMultiplier) * 100).toFixed(0)}% faster`;
+        } else if (upgradeKey === 'BLAST_RADIUS') {
+            description = `+${((upgrade.radiusMultiplier - 1) * 100).toFixed(0)}% radius<br>+${((upgrade.explosiveDamageMultiplier - 1) * 100).toFixed(0)}% blast dmg`;
+        }
+
         card.innerHTML = `
             <div style="font-weight: bold; color: #ffcc00; margin-bottom: 10px; font-size: 13px;">${upgrade.name}</div>
+            <div style="font-size: 11px; color: #aaa; margin-bottom: 5px;">${description}</div>
             ${hasUpgrade ? '<div style="color: #00ff00;">✓ OWNED</div>' : `<div style="margin-top: 10px;">💰 ${upgrade.cost}</div>`}
         `;
 
