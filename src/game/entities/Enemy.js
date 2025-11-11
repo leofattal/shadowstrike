@@ -270,9 +270,29 @@ export class Enemy {
         rayHelper.show(this.scene, new BABYLON.Color3(1, 0.5, 0));
         setTimeout(() => rayHelper.hide(), 100);
 
-        // Check if ray intersects with player position (since player mesh is invisible)
-        // We'll do a manual distance check to player position
+        // First, check if there are any obstacles between enemy and player
+        const obstacleCheck = this.scene.pickWithRay(ray, (mesh) => {
+            // Check for level geometry (walls, floors, etc.) but not enemies or player
+            return mesh.checkCollisions &&
+                   !mesh.name.startsWith('enemy') &&
+                   mesh.name !== 'player' &&
+                   mesh !== this.player.mesh;
+        });
 
+        // If we hit an obstacle before reaching the player, the shot is blocked
+        if (obstacleCheck && obstacleCheck.hit) {
+            const distanceToObstacle = BABYLON.Vector3.Distance(weaponWorldPos, obstacleCheck.pickedPoint);
+            const distanceToPlayer = BABYLON.Vector3.Distance(weaponWorldPos, playerCenter);
+
+            if (distanceToObstacle < distanceToPlayer) {
+                console.log('Enemy shot blocked by obstacle:', obstacleCheck.pickedMesh.name);
+                // Create bullet impact on wall
+                this.createBulletImpact(obstacleCheck.pickedPoint);
+                return;
+            }
+        }
+
+        // No obstacle blocking, now check if ray intersects with player position
         // Calculate closest point on ray to player
         const rayToPlayer = playerCenter.subtract(weaponWorldPos);
         const rayDot = BABYLON.Vector3.Dot(rayToPlayer, direction);
