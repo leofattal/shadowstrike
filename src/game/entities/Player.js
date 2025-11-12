@@ -62,10 +62,19 @@ export class Player {
         // Callbacks
         this.onEnemyKilled = null;
         this.onPlayerDeath = null;
+        this.onEnemyHit = null; // Callback for hit markers
 
         // Stats tracking
         this.enemiesKilled = 0;
         this.isDead = false;
+
+        // Combo and multiplier system
+        this.comboKills = 0;
+        this.comboMultiplier = 1;
+        this.lastKillTime = 0;
+        this.comboTimeout = 3000; // 3 seconds to maintain combo
+        this.killstreak = 0;
+        this.timeScale = 1.0; // For slow-motion effects
     }
 
     spawn(position) {
@@ -108,6 +117,9 @@ export class Player {
     update(deltaTime) {
         if (!this.mesh || !this.camera) return;
         if (this.isDead) return; // Don't update if dead
+
+        // Update combo timer
+        this.updateComboTimer(deltaTime);
 
         // Handle automated ladder climbing
         if (this.isClimbingLadder) {
@@ -298,14 +310,14 @@ export class Player {
             if (enemyComponent) {
                 const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
 
+                // Show hit marker
+                if (this.onEnemyHit) {
+                    this.onEnemyHit(wasHeadshot);
+                }
+
                 // Check if enemy died
                 if (!enemyComponent.alive) {
-                    this.enemiesKilled++;
-
-                    // Notify game about the kill (will be handled by callback)
-                    if (this.onEnemyKilled) {
-                        this.onEnemyKilled(wasHeadshot);
-                    }
+                    this.registerKill(wasHeadshot);
                 }
             } else {
                 console.log('No enemy component found on:', hit.pickedMesh.name);
@@ -476,12 +488,7 @@ export class Player {
 
                     // Check if enemy died from this explosion
                     if (wasAlive && !enemyComponent.alive) {
-                        this.enemiesKilled++;
-
-                        // Award coins for explosive kill
-                        if (this.onEnemyKilled) {
-                            this.onEnemyKilled(false); // Not a headshot
-                        }
+                        this.registerKill(false); // Explosion kill
                     }
                 }
             }
@@ -557,6 +564,82 @@ export class Player {
     addCoins(amount) {
         this.coins += amount;
         console.log(`+${amount} coins! Total: ${this.coins}`);
+    }
+
+    registerKill(wasHeadshot) {
+        const now = performance.now();
+
+        // Check if combo is still active
+        if (now - this.lastKillTime < this.comboTimeout) {
+            this.comboKills++;
+        } else {
+            this.comboKills = 1; // Reset combo
+        }
+
+        this.lastKillTime = now;
+        this.enemiesKilled++;
+        this.killstreak++;
+
+        // Calculate multiplier based on combo
+        if (this.comboKills >= 10) {
+            this.comboMultiplier = 5;
+        } else if (this.comboKills >= 5) {
+            this.comboMultiplier = 3;
+        } else if (this.comboKills >= 3) {
+            this.comboMultiplier = 2;
+        } else {
+            this.comboMultiplier = 1;
+        }
+
+        // Calculate coins with multiplier
+        let coinReward = wasHeadshot ? 100 : 50;
+        coinReward = Math.round(coinReward * this.comboMultiplier);
+        this.addCoins(coinReward);
+
+        // Trigger slow-mo on headshot
+        if (wasHeadshot) {
+            this.triggerSlowMotion();
+        }
+
+        // Killstreak rewards
+        this.checkKillstreakRewards();
+
+        // Notify game about the kill
+        if (this.onEnemyKilled) {
+            this.onEnemyKilled(wasHeadshot);
+        }
+
+        console.log(`💀 Kill! Combo: ${this.comboKills}x | Multiplier: ${this.comboMultiplier}x | Killstreak: ${this.killstreak}`);
+    }
+
+    updateComboTimer(deltaTime) {
+        const now = performance.now();
+        if (now - this.lastKillTime > this.comboTimeout && this.comboKills > 0) {
+            console.log(`Combo broken! Final: ${this.comboKills} kills`);
+            this.comboKills = 0;
+            this.comboMultiplier = 1;
+        }
+    }
+
+    triggerSlowMotion() {
+        this.timeScale = 0.3; // 30% speed
+        setTimeout(() => {
+            this.timeScale = 1.0; // Back to normal
+        }, 500); // 0.5 seconds of slow-mo
+    }
+
+    checkKillstreakRewards() {
+        if (this.killstreak === 5) {
+            console.log('🔥 KILLSTREAK! Double coins for 10 seconds!');
+            // This would be handled by a timer in update
+        } else if (this.killstreak === 10) {
+            console.log('🔥🔥 MEGA KILLSTREAK! Free ammo refill!');
+            this.currentAmmo = this.weaponStats.maxAmmo;
+            this.reserveAmmo = this.weaponStats.reserveAmmo;
+        } else if (this.killstreak === 15) {
+            console.log('🔥🔥🔥 UNSTOPPABLE! Temporary invincibility!');
+            // This would trigger invincibility
+        }
     }
 
     loadWeaponStats() {

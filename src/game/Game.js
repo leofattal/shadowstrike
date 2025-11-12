@@ -50,12 +50,15 @@ export class Game {
 
         // Set up player callbacks
         this.player.onEnemyKilled = (wasHeadshot) => {
-            const coinReward = wasHeadshot ? 100 : 50; // Bonus for headshot
-            this.player.addCoins(coinReward);
+            // Coins are now handled in registerKill with multiplier
         };
 
         this.player.onPlayerDeath = (coins, enemiesKilled) => {
             this.uiManager.showDeathScreen(coins, enemiesKilled);
+        };
+
+        this.player.onEnemyHit = (wasHeadshot) => {
+            this.uiManager.showHitMarker(wasHeadshot);
         };
 
         // Create shop
@@ -128,6 +131,7 @@ export class Game {
             this.uiManager.updateCoins(this.player.coins);
             this.uiManager.updateWeaponInfo(this.player.weaponStats.name,
                 this.player.weaponStats.hasExplosiveAmmo ? 'EXPLOSIVE' : 'STANDARD');
+            this.uiManager.updateComboDisplay(this.player.comboKills, this.player.comboMultiplier, this.player.killstreak);
         }
 
         if (this.enemyManager && this.uiManager) {

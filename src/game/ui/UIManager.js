@@ -13,6 +13,12 @@ export class UIManager {
         this.deathStats = document.getElementById('deathStats');
         this.spawnWaveBtn = document.getElementById('spawnWaveBtn');
         this.respawnBtn = document.getElementById('respawnBtn');
+        this.comboDisplay = document.getElementById('comboDisplay');
+        this.comboText = document.getElementById('comboText');
+        this.multiplierText = document.getElementById('multiplierText');
+        this.killstreakDisplay = document.getElementById('killstreakDisplay');
+        this.killstreakText = document.getElementById('killstreakText');
+        this.hitMarker = document.getElementById('hitMarker');
     }
 
     updateScopeVisibility(isZooming) {
@@ -98,6 +104,41 @@ export class UIManager {
 
     hideDeathScreen() {
         this.deathScreen.style.display = 'none';
+    }
+
+    updateComboDisplay(comboKills, multiplier, killstreak) {
+        if (comboKills > 1) {
+            this.comboDisplay.style.display = 'block';
+            this.comboText.textContent = `COMBO x${comboKills}`;
+            this.multiplierText.textContent = `${multiplier}x`;
+        } else {
+            this.comboDisplay.style.display = 'none';
+        }
+
+        if (killstreak >= 5) {
+            this.killstreakDisplay.style.display = 'block';
+            this.killstreakText.textContent = killstreak;
+        } else {
+            this.killstreakDisplay.style.display = 'none';
+        }
+    }
+
+    showHitMarker(isHeadshot = false) {
+        this.hitMarker.classList.remove('active', 'headshot');
+
+        if (isHeadshot) {
+            this.hitMarker.classList.add('headshot');
+        }
+
+        // Trigger animation
+        setTimeout(() => {
+            this.hitMarker.classList.add('active');
+        }, 10);
+
+        // Remove after animation
+        setTimeout(() => {
+            this.hitMarker.classList.remove('active', 'headshot');
+        }, 220);
     }
 
     showMessage(message, duration = 3000) {

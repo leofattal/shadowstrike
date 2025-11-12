@@ -29,78 +29,153 @@ export class Enemy {
     }
 
     createMesh(position) {
-        // Create a parent mesh for the entire soldier
+        // Create a parent mesh for the entire soldier - positioned at ground level (y=0)
         this.mesh = new BABYLON.TransformNode('enemy', this.scene);
         this.mesh.position = position.clone();
+        this.mesh.position.y = 0; // Ensure grounded
 
-        // Body (torso) - made taller to reduce gap
-        const body = BABYLON.MeshBuilder.CreateBox('enemyBody', {
-            width: 0.5,
-            height: 1.0,
-            depth: 0.3
+        // Body (torso) - realistic capsule shape
+        const body = BABYLON.MeshBuilder.CreateCapsule('enemyBody', {
+            radius: 0.25,
+            height: 0.8,
+            tessellation: 16
         }, this.scene);
-        body.position.y = 1.1;
+        body.position.y = 1.3; // Above ground
         body.parent = this.mesh;
 
-        // Neck - fills the gap between head and body
+        // Neck - cylinder connecting head and body
         const neck = BABYLON.MeshBuilder.CreateCylinder('enemyNeck', {
-            diameter: 0.18,
-            height: 0.2
+            diameterTop: 0.15,
+            diameterBottom: 0.18,
+            height: 0.15,
+            tessellation: 12
         }, this.scene);
-        neck.position.y = 1.7;
+        neck.position.y = 1.75;
         neck.parent = this.mesh;
 
-        // Head
-        const head = BABYLON.MeshBuilder.CreateBox('enemyHead', {
-            width: 0.3,
-            height: 0.3,
-            depth: 0.3
+        // Head - sphere for realistic shape
+        const head = BABYLON.MeshBuilder.CreateSphere('enemyHead', {
+            diameter: 0.35,
+            segments: 16
         }, this.scene);
-        head.position.y = 1.85;
+        head.position.y = 1.92;
         head.parent = this.mesh;
 
-        // Legs
-        const leftLeg = BABYLON.MeshBuilder.CreateBox('enemyLeftLeg', {
-            width: 0.2,
-            height: 0.6,
-            depth: 0.2
+        // Helmet/Cap on head for military look
+        const helmet = BABYLON.MeshBuilder.CreateSphere('enemyHelmet', {
+            diameter: 0.37,
+            segments: 16,
+            slice: 0.6 // Only top half
         }, this.scene);
-        leftLeg.position = new BABYLON.Vector3(-0.12, 0.3, 0);
+        helmet.position.y = 1.98;
+        helmet.parent = this.mesh;
+
+        // Legs - cylinders for realistic limbs
+        const leftLeg = BABYLON.MeshBuilder.CreateCylinder('enemyLeftLeg', {
+            diameterTop: 0.14,
+            diameterBottom: 0.12,
+            height: 0.9,
+            tessellation: 12
+        }, this.scene);
+        leftLeg.position = new BABYLON.Vector3(-0.13, 0.45, 0);
         leftLeg.parent = this.mesh;
 
-        const rightLeg = BABYLON.MeshBuilder.CreateBox('enemyRightLeg', {
-            width: 0.2,
-            height: 0.6,
-            depth: 0.2
+        const rightLeg = BABYLON.MeshBuilder.CreateCylinder('enemyRightLeg', {
+            diameterTop: 0.14,
+            diameterBottom: 0.12,
+            height: 0.9,
+            tessellation: 12
         }, this.scene);
-        rightLeg.position = new BABYLON.Vector3(0.12, 0.3, 0);
+        rightLeg.position = new BABYLON.Vector3(0.13, 0.45, 0);
         rightLeg.parent = this.mesh;
 
-        // Arms
-        const leftArm = BABYLON.MeshBuilder.CreateBox('enemyLeftArm', {
-            width: 0.15,
-            height: 0.5,
-            depth: 0.15
+        // Feet - small boxes for boots
+        const leftFoot = BABYLON.MeshBuilder.CreateBox('enemyLeftFoot', {
+            width: 0.14,
+            height: 0.08,
+            depth: 0.25
         }, this.scene);
-        leftArm.position = new BABYLON.Vector3(-0.35, 1.0, 0);
-        leftArm.parent = this.mesh;
+        leftFoot.position = new BABYLON.Vector3(-0.13, 0.04, 0.05);
+        leftFoot.parent = this.mesh;
 
-        const rightArm = BABYLON.MeshBuilder.CreateBox('enemyRightArm', {
-            width: 0.15,
-            height: 0.5,
-            depth: 0.15
+        const rightFoot = BABYLON.MeshBuilder.CreateBox('enemyRightFoot', {
+            width: 0.14,
+            height: 0.08,
+            depth: 0.25
         }, this.scene);
-        rightArm.position = new BABYLON.Vector3(0.35, 1.0, 0);
-        rightArm.parent = this.mesh;
+        rightFoot.position = new BABYLON.Vector3(0.13, 0.04, 0.05);
+        rightFoot.parent = this.mesh;
 
-        // Weapon (simple rifle shape)
-        const weapon = BABYLON.MeshBuilder.CreateBox('enemyWeapon', {
-            width: 0.1,
-            height: 0.1,
-            depth: 0.6
+        // Upper Arms - cylinders
+        const leftUpperArm = BABYLON.MeshBuilder.CreateCylinder('enemyLeftUpperArm', {
+            diameter: 0.11,
+            height: 0.35,
+            tessellation: 12
         }, this.scene);
-        weapon.position = new BABYLON.Vector3(0.25, 0.9, 0.3);
-        weapon.parent = this.mesh;
+        leftUpperArm.position = new BABYLON.Vector3(-0.38, 1.45, 0);
+        leftUpperArm.parent = this.mesh;
+
+        const rightUpperArm = BABYLON.MeshBuilder.CreateCylinder('enemyRightUpperArm', {
+            diameter: 0.11,
+            height: 0.35,
+            tessellation: 12
+        }, this.scene);
+        rightUpperArm.position = new BABYLON.Vector3(0.38, 1.45, 0);
+        rightUpperArm.parent = this.mesh;
+
+        // Lower Arms - slightly thinner cylinders
+        const leftLowerArm = BABYLON.MeshBuilder.CreateCylinder('enemyLeftLowerArm', {
+            diameterTop: 0.09,
+            diameterBottom: 0.08,
+            height: 0.3,
+            tessellation: 12
+        }, this.scene);
+        leftLowerArm.position = new BABYLON.Vector3(-0.38, 1.1, 0.15);
+        leftLowerArm.rotation.x = Math.PI / 6; // Slight bend
+        leftLowerArm.parent = this.mesh;
+
+        const rightLowerArm = BABYLON.MeshBuilder.CreateCylinder('enemyRightLowerArm', {
+            diameterTop: 0.09,
+            diameterBottom: 0.08,
+            height: 0.3,
+            tessellation: 12
+        }, this.scene);
+        rightLowerArm.position = new BABYLON.Vector3(0.38, 1.1, 0.15);
+        rightLowerArm.rotation.x = Math.PI / 6; // Slight bend
+        rightLowerArm.parent = this.mesh;
+
+        // Hands
+        const leftHand = BABYLON.MeshBuilder.CreateSphere('enemyLeftHand', {
+            diameter: 0.08,
+            segments: 8
+        }, this.scene);
+        leftHand.position = new BABYLON.Vector3(-0.38, 0.95, 0.25);
+        leftHand.parent = this.mesh;
+
+        const rightHand = BABYLON.MeshBuilder.CreateSphere('enemyRightHand', {
+            diameter: 0.08,
+            segments: 8
+        }, this.scene);
+        rightHand.position = new BABYLON.Vector3(0.38, 0.95, 0.25);
+        rightHand.parent = this.mesh;
+
+        // Weapon (realistic rifle shape)
+        const weaponBody = BABYLON.MeshBuilder.CreateCylinder('enemyWeaponBody', {
+            diameter: 0.04,
+            height: 0.6,
+            tessellation: 8
+        }, this.scene);
+        weaponBody.rotation.x = Math.PI / 2;
+        weaponBody.position = new BABYLON.Vector3(0.25, 1.1, 0.35);
+        weaponBody.parent = this.mesh;
+
+        const weaponStock = BABYLON.MeshBuilder.CreateBox('enemyWeaponStock', {
+            width: 0.08,
+            height: 0.06,
+            depth: 0.2
+        }, this.scene);
+        weaponStock.position = new BABYLON.Vector3(0.25, 1.1, 0.05);
+        weaponStock.parent = this.mesh;
 
         // Create materials
         const bodyMaterial = new BABYLON.StandardMaterial('enemyBodyMat', this.scene);
@@ -112,6 +187,14 @@ export class Enemy {
         skinMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.55, 0.45); // Skin tone
         skinMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
 
+        const helmetMaterial = new BABYLON.StandardMaterial('enemyHelmetMat', this.scene);
+        helmetMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.25, 0.2); // Dark green helmet
+        helmetMaterial.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+
+        const bootMaterial = new BABYLON.StandardMaterial('enemyBootMat', this.scene);
+        bootMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.12, 0.1); // Dark brown boots
+        bootMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
         const weaponMaterial = new BABYLON.StandardMaterial('enemyWeaponMat', this.scene);
         weaponMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2); // Dark metal
         weaponMaterial.specularColor = new BABYLON.Color3(0.4, 0.4, 0.4);
@@ -121,17 +204,27 @@ export class Enemy {
         body.material = bodyMaterial;
         neck.material = skinMaterial;
         head.material = skinMaterial;
+        helmet.material = helmetMaterial;
         leftLeg.material = bodyMaterial;
         rightLeg.material = bodyMaterial;
-        leftArm.material = bodyMaterial;
-        rightArm.material = bodyMaterial;
-        weapon.material = weaponMaterial;
+        leftFoot.material = bootMaterial;
+        rightFoot.material = bootMaterial;
+        leftUpperArm.material = bodyMaterial;
+        rightUpperArm.material = bodyMaterial;
+        leftLowerArm.material = bodyMaterial;
+        rightLowerArm.material = bodyMaterial;
+        leftHand.material = skinMaterial;
+        rightHand.material = skinMaterial;
+        weaponBody.material = weaponMaterial;
+        weaponStock.material = bootMaterial;
 
         // Enable collisions and shadows
         this.mesh.checkCollisions = true;
 
         // Add all parts to shadow generator (will be set by LevelManager)
-        this.bodyParts = [body, neck, head, leftLeg, rightLeg, leftArm, rightArm, weapon];
+        this.bodyParts = [body, neck, head, helmet, leftLeg, rightLeg, leftFoot, rightFoot,
+                         leftUpperArm, rightUpperArm, leftLowerArm, rightLowerArm,
+                         leftHand, rightHand, weaponBody, weaponStock];
 
         // Store reference to this enemy component on parent and all body parts
         this.mesh.enemyComponent = this;
@@ -153,7 +246,7 @@ export class Enemy {
             height: 0.1
         }, this.scene);
 
-        plane.position = new BABYLON.Vector3(0, 2.3, 0);
+        plane.position = new BABYLON.Vector3(0, 2.25, 0);
         plane.parent = this.mesh;
         plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
@@ -166,13 +259,14 @@ export class Enemy {
     }
 
     setupPatrol(startPos) {
-        // Create simple patrol route (square pattern)
+        // Create simple patrol route (square pattern) - all at ground level
         const offset = 5;
+        const groundY = 0;
         this.patrolPoints = [
-            startPos.clone(),
-            startPos.add(new BABYLON.Vector3(offset, 0, 0)),
-            startPos.add(new BABYLON.Vector3(offset, 0, offset)),
-            startPos.add(new BABYLON.Vector3(0, 0, offset))
+            new BABYLON.Vector3(startPos.x, groundY, startPos.z),
+            new BABYLON.Vector3(startPos.x + offset, groundY, startPos.z),
+            new BABYLON.Vector3(startPos.x + offset, groundY, startPos.z + offset),
+            new BABYLON.Vector3(startPos.x, groundY, startPos.z + offset)
         ];
     }
 
