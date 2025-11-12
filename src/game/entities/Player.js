@@ -280,62 +280,68 @@ export class Player {
 
         const ray = new BABYLON.Ray(origin, forward, 1000);
 
-        // Visualize the ray (for debugging)
-        const rayHelper = new BABYLON.RayHelper(ray);
-        rayHelper.show(this.scene, new BABYLON.Color3(1, 0, 0));
-        setTimeout(() => rayHelper.hide(), 50);
-
-        // Check for hits
+        // Check for hits first
         const hit = this.scene.pickWithRay(ray, (mesh) => {
             return mesh !== this.mesh && mesh.name.startsWith('enemy');
         });
 
-        if (hit && hit.hit) {
-            console.log('Hit enemy:', hit.pickedMesh.name);
+        // Check if headshot
+        const isHeadshot = hit && hit.hit && hit.pickedMesh.isHeadshot === true;
 
-            // Create bullet impact effect
-            this.createBulletImpact(hit.pickedPoint);
+        // If headshot, create bullet cam with physical bullet
+        if (isHeadshot) {
+            this.createBulletCam(origin, forward, hit);
+        } else {
+            // Normal instant raycast shooting
+            // Visualize the ray (for debugging)
+            const rayHelper = new BABYLON.RayHelper(ray);
+            rayHelper.show(this.scene, new BABYLON.Color3(1, 0, 0));
+            setTimeout(() => rayHelper.hide(), 50);
 
-            // Check if headshot
-            const isHeadshot = hit.pickedMesh.isHeadshot === true;
+            if (hit && hit.hit) {
+                console.log('Hit enemy:', hit.pickedMesh.name);
 
-            // Damage the enemy - check both the mesh and its parent
-            let enemyComponent = hit.pickedMesh.enemyComponent;
+                // Create bullet impact effect
+                this.createBulletImpact(hit.pickedPoint);
 
-            // If the mesh doesn't have the component, check its parent
-            if (!enemyComponent && hit.pickedMesh.parent) {
-                enemyComponent = hit.pickedMesh.parent.enemyComponent;
-            }
+                // Damage the enemy - check both the mesh and its parent
+                let enemyComponent = hit.pickedMesh.enemyComponent;
 
-            if (enemyComponent) {
-                const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
-
-                // Show hit marker
-                if (this.onEnemyHit) {
-                    this.onEnemyHit(wasHeadshot);
+                // If the mesh doesn't have the component, check its parent
+                if (!enemyComponent && hit.pickedMesh.parent) {
+                    enemyComponent = hit.pickedMesh.parent.enemyComponent;
                 }
 
-                // Check if enemy died
-                if (!enemyComponent.alive) {
-                    this.registerKill(wasHeadshot);
+                if (enemyComponent) {
+                    const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
+
+                    // Show hit marker
+                    if (this.onEnemyHit) {
+                        this.onEnemyHit(wasHeadshot);
+                    }
+
+                    // Check if enemy died
+                    if (!enemyComponent.alive) {
+                        this.registerKill(wasHeadshot);
+                    }
+                } else {
+                    console.log('No enemy component found on:', hit.pickedMesh.name);
                 }
-            } else {
-                console.log('No enemy component found on:', hit.pickedMesh.name);
-            }
 
-            // Handle explosive ammo
-            if (this.weaponStats.hasExplosiveAmmo) {
-                this.createExplosion(hit.pickedPoint);
-            }
-        } else if (this.weaponStats.hasExplosiveAmmo) {
-            // Even if we don't hit an enemy, create explosion at max range or terrain
-            const maxRangePoint = origin.add(forward.scale(1000));
-            const terrainHit = this.scene.pickWithRay(new BABYLON.Ray(origin, forward, 1000), (mesh) => {
-                return mesh.checkCollisions && !mesh.name.startsWith('enemy');
-            });
+                // Handle explosive ammo
+                if (this.weaponStats.hasExplosiveAmmo) {
+                    this.createExplosion(hit.pickedPoint);
+                }
+            } else if (this.weaponStats.hasExplosiveAmmo) {
+                // Even if we don't hit an enemy, create explosion at max range or terrain
+                const maxRangePoint = origin.add(forward.scale(1000));
+                const terrainHit = this.scene.pickWithRay(new BABYLON.Ray(origin, forward, 1000), (mesh) => {
+                    return mesh.checkCollisions && !mesh.name.startsWith('enemy');
+                });
 
-            if (terrainHit && terrainHit.hit) {
-                this.createExplosion(terrainHit.pickedPoint);
+                if (terrainHit && terrainHit.hit) {
+                    this.createExplosion(terrainHit.pickedPoint);
+                }
             }
         }
 
@@ -343,6 +349,111 @@ export class Player {
         if (this.currentAmmo <= 0 && this.reserveAmmo > 0) {
             this.reload();
         }
+    }
+
+    createBulletCam(origin, direction, hit) {
+        // Trigger slow motion
+        this.triggerSlowMotion();
+
+        // Create visible bullet
+        const bullet = BABYLON.MeshBuilder.CreateCylinder('bullet', {
+            height: 0.05,
+            diameterTop: 0.01,
+            diameterBottom: 0.01,
+            tessellation: 8
+        }, this.scene);
+
+        const bulletMaterial = new BABYLON.StandardMaterial('bulletMat', this.scene);
+        bulletMaterial.emissiveColor = new BABYLON.Color3(1, 0.8, 0.2);
+        bulletMaterial.disableLighting = true;
+        bullet.material = bulletMaterial;
+
+        bullet.position = origin.clone();
+
+        // Create bullet camera
+        const bulletCam = new BABYLON.FreeCamera('bulletCam', origin.clone(), this.scene);
+        bulletCam.setTarget(origin.add(direction.scale(5)));
+
+        // Store original camera
+        const originalCamera = this.scene.activeCamera;
+
+        // Switch to bullet cam
+        this.scene.activeCamera = bulletCam;
+
+        // Calculate bullet travel distance and time
+        const targetPoint = hit.pickedPoint;
+        const distance = BABYLON.Vector3.Distance(origin, targetPoint);
+        const bulletSpeed = 200; // Units per second (slowed by timeScale)
+        const travelTime = (distance / bulletSpeed) * 1000; // Convert to milliseconds
+
+        // Animate bullet
+        let startTime = performance.now();
+        const bulletVelocity = direction.scale(bulletSpeed);
+
+        const bulletUpdate = () => {
+            const elapsed = (performance.now() - startTime) / 1000;
+            const progress = Math.min(elapsed / (travelTime / 1000), 1.0);
+
+            if (progress < 1.0) {
+                // Update bullet position (affected by timeScale)
+                const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
+                bullet.position.addInPlace(bulletVelocity.scale(scaledDelta * this.timeScale));
+
+                // Orient bullet to direction of travel
+                bullet.rotation.x = Math.PI / 2;
+                const lookAt = bullet.position.add(direction);
+                bullet.lookAt(lookAt);
+
+                // Update camera to follow bullet
+                const cameraOffset = direction.scale(-2).add(new BABYLON.Vector3(0, 0.5, 0));
+                bulletCam.position = bullet.position.add(cameraOffset);
+                bulletCam.setTarget(bullet.position.add(direction.scale(5)));
+
+                this.scene.registerAfterRender(bulletUpdate);
+            } else {
+                // Bullet reached target
+                this.scene.unregisterAfterRender(bulletUpdate);
+
+                // Create bullet impact effect
+                this.createBulletImpact(targetPoint);
+
+                // Damage the enemy
+                let enemyComponent = hit.pickedMesh.enemyComponent;
+                if (!enemyComponent && hit.pickedMesh.parent) {
+                    enemyComponent = hit.pickedMesh.parent.enemyComponent;
+                }
+
+                if (enemyComponent) {
+                    const wasHeadshot = enemyComponent.takeDamage(this.damage, true);
+
+                    // Show hit marker
+                    if (this.onEnemyHit) {
+                        this.onEnemyHit(wasHeadshot);
+                    }
+
+                    // Check if enemy died
+                    if (!enemyComponent.alive) {
+                        this.registerKill(wasHeadshot);
+                    }
+                }
+
+                // Handle explosive ammo
+                if (this.weaponStats.hasExplosiveAmmo) {
+                    this.createExplosion(targetPoint);
+                }
+
+                // Clean up bullet
+                bullet.dispose();
+
+                // Wait a moment then restore original camera
+                setTimeout(() => {
+                    this.scene.activeCamera = originalCamera;
+                    bulletCam.dispose();
+                }, 300);
+            }
+        };
+
+        this.scene.registerAfterRender(bulletUpdate);
     }
 
     createMuzzleFlash() {

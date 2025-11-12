@@ -501,7 +501,16 @@ export class Enemy {
         // Award coins to player (will be handled by EnemyManager)
         const coinReward = 50; // Base reward
 
-        // Play death animation (for now just dispose)
+        // Create blood particle effect
+        this.createBloodEffect();
+
+        // Apply ragdoll physics to body parts
+        this.applyRagdollPhysics();
+
+        // Play death animation with falling
+        this.animateDeath();
+
+        // Dispose after animation completes
         setTimeout(() => {
             // Dispose all body parts
             if (this.bodyParts) {
@@ -515,8 +524,143 @@ export class Enemy {
             if (this.mesh) {
                 this.mesh.dispose();
             }
-        }, 100);
+        }, 3000);
 
         return coinReward;
+    }
+
+    createBloodEffect() {
+        // Create blood particle system
+        const bloodSystem = new BABYLON.ParticleSystem("blood", 100, this.scene);
+
+        // Position at head
+        const headPosition = this.mesh.position.add(new BABYLON.Vector3(0, 1.8, 0));
+        bloodSystem.emitter = headPosition;
+
+        // Create simple red texture
+        bloodSystem.particleTexture = new BABYLON.Texture(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
+            this.scene
+        );
+
+        // Blood colors - dark red
+        bloodSystem.color1 = new BABYLON.Color4(0.6, 0, 0, 1.0);
+        bloodSystem.color2 = new BABYLON.Color4(0.8, 0.1, 0.1, 1.0);
+        bloodSystem.colorDead = new BABYLON.Color4(0.3, 0, 0, 0.0);
+
+        bloodSystem.minSize = 0.05;
+        bloodSystem.maxSize = 0.15;
+
+        bloodSystem.minLifeTime = 0.3;
+        bloodSystem.maxLifeTime = 0.8;
+
+        bloodSystem.emitRate = 200;
+
+        // Spray in all directions
+        bloodSystem.direction1 = new BABYLON.Vector3(-1, 0.5, -1);
+        bloodSystem.direction2 = new BABYLON.Vector3(1, 2, 1);
+
+        bloodSystem.minEmitPower = 2;
+        bloodSystem.maxEmitPower = 5;
+
+        bloodSystem.gravity = new BABYLON.Vector3(0, -9.81, 0);
+
+        bloodSystem.updateSpeed = 0.01;
+
+        // Start and auto-stop
+        bloodSystem.targetStopDuration = 0.2;
+        bloodSystem.start();
+
+        setTimeout(() => {
+            bloodSystem.dispose();
+        }, 1000);
+    }
+
+    applyRagdollPhysics() {
+        // Apply physics-like rotation and falling to body parts
+        if (!this.bodyParts) return;
+
+        this.bodyParts.forEach((part, index) => {
+            if (!part) return;
+
+            // Detach from parent transform to allow independent movement
+            part.parent = null;
+
+            // Store initial world position
+            const worldPos = part.getAbsolutePosition().clone();
+            part.position = worldPos;
+
+            // Add random rotation velocities for ragdoll effect
+            const randomRotVel = {
+                x: (Math.random() - 0.5) * 0.1,
+                y: (Math.random() - 0.5) * 0.1,
+                z: (Math.random() - 0.5) * 0.1
+            };
+
+            // Add slight outward velocity for parts flying apart
+            const randomVel = new BABYLON.Vector3(
+                (Math.random() - 0.5) * 0.5,
+                Math.random() * 0.2,
+                (Math.random() - 0.5) * 0.5
+            );
+
+            // Store velocities on the mesh
+            part.ragdollRotVel = randomRotVel;
+            part.ragdollVel = randomVel;
+            part.ragdollGravity = 0;
+        });
+    }
+
+    animateDeath() {
+        // Animate the entire enemy falling backward
+        const fallDuration = 1.5; // seconds
+        const startTime = performance.now();
+        const startRotation = this.mesh.rotation.clone();
+        const startPosition = this.mesh.position.clone();
+
+        const deathAnimation = () => {
+            const elapsed = (performance.now() - startTime) / 1000;
+            const progress = Math.min(elapsed / fallDuration, 1.0);
+
+            if (progress < 1.0 && this.mesh) {
+                // Fall backward (rotate around X axis)
+                this.mesh.rotation.x = startRotation.x - (Math.PI / 2) * progress;
+
+                // Fall down to ground
+                this.mesh.position.y = startPosition.y - (startPosition.y * progress);
+
+                // Apply ragdoll physics to individual body parts
+                if (this.bodyParts) {
+                    this.bodyParts.forEach(part => {
+                        if (!part || !part.ragdollRotVel) return;
+
+                        const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
+
+                        // Apply rotation
+                        part.rotation.x += part.ragdollRotVel.x;
+                        part.rotation.y += part.ragdollRotVel.y;
+                        part.rotation.z += part.ragdollRotVel.z;
+
+                        // Apply velocity and gravity
+                        part.ragdollGravity -= 9.81 * deltaTime;
+                        part.ragdollVel.y += part.ragdollGravity * deltaTime;
+                        part.position.addInPlace(part.ragdollVel.scale(deltaTime));
+
+                        // Stop when hitting ground
+                        if (part.position.y < 0.1) {
+                            part.position.y = 0.1;
+                            part.ragdollVel.y = 0;
+                            part.ragdollGravity = 0;
+                        }
+                    });
+                }
+
+                this.scene.registerAfterRender(deathAnimation);
+            } else {
+                this.scene.unregisterAfterRender(deathAnimation);
+            }
+        };
+
+        this.scene.registerAfterRender(deathAnimation);
     }
 }
