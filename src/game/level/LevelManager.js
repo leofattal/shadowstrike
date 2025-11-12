@@ -324,6 +324,7 @@ export class LevelManager {
     }
 
     createSkybox() {
+        // Create main skybox
         const skybox = BABYLON.MeshBuilder.CreateBox('skyBox', { size: 1000 }, this.scene);
         const skyboxMaterial = new BABYLON.StandardMaterial('skyBoxMat', this.scene);
 
@@ -332,10 +333,94 @@ export class LevelManager {
         skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
         skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
 
-        // Create a dusk/tactical atmosphere skybox
-        skyboxMaterial.emissiveColor = new BABYLON.Color3(0.15, 0.2, 0.35);
+        // Realistic daytime sky color
+        skyboxMaterial.emissiveColor = new BABYLON.Color3(0.4, 0.6, 0.9);
 
         skybox.material = skyboxMaterial;
         skybox.infiniteDistance = true;
+
+        // Add procedural clouds using particle system
+        this.createClouds();
+
+        // Add distant mountains/hills
+        this.createDistantTerrain();
+
+        // Add some atmospheric fog
+        this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+        this.scene.fogDensity = 0.0015;
+        this.scene.fogColor = new BABYLON.Color3(0.6, 0.7, 0.85);
+    }
+
+    createClouds() {
+        // Create simple cloud sprites using planes
+        for (let i = 0; i < 20; i++) {
+            const cloud = BABYLON.MeshBuilder.CreatePlane('cloud' + i, { size: 50 }, this.scene);
+
+            // Position clouds randomly in the sky
+            cloud.position = new BABYLON.Vector3(
+                (Math.random() - 0.5) * 400,
+                80 + Math.random() * 40,
+                (Math.random() - 0.5) * 400
+            );
+
+            cloud.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+            const cloudMaterial = new BABYLON.StandardMaterial('cloudMat' + i, this.scene);
+            cloudMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+            cloudMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.95);
+            cloudMaterial.alpha = 0.3 + Math.random() * 0.3;
+            cloudMaterial.disableLighting = true;
+            cloud.material = cloudMaterial;
+        }
+    }
+
+    createDistantTerrain() {
+        // Create distant mountain silhouettes
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i) / 8;
+            const distance = 300;
+
+            const mountain = BABYLON.MeshBuilder.CreateBox('mountain' + i, {
+                width: 80,
+                height: 30 + Math.random() * 40,
+                depth: 40
+            }, this.scene);
+
+            mountain.position = new BABYLON.Vector3(
+                Math.cos(angle) * distance,
+                15,
+                Math.sin(angle) * distance
+            );
+
+            const mountainMat = new BABYLON.StandardMaterial('mountainMat' + i, this.scene);
+            mountainMat.diffuseColor = new BABYLON.Color3(0.3, 0.35, 0.3);
+            mountainMat.emissiveColor = new BABYLON.Color3(0.2, 0.25, 0.2);
+            mountainMat.specularColor = new BABYLON.Color3(0, 0, 0);
+            mountain.material = mountainMat;
+        }
+
+        // Add some distant trees/forest
+        for (let i = 0; i < 30; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 150 + Math.random() * 100;
+
+            const tree = BABYLON.MeshBuilder.CreateCylinder('tree' + i, {
+                diameterTop: 0,
+                diameterBottom: 3,
+                height: 15 + Math.random() * 10,
+                tessellation: 8
+            }, this.scene);
+
+            tree.position = new BABYLON.Vector3(
+                Math.cos(angle) * distance,
+                7,
+                Math.sin(angle) * distance
+            );
+
+            const treeMat = new BABYLON.StandardMaterial('treeMat' + i, this.scene);
+            treeMat.diffuseColor = new BABYLON.Color3(0.15, 0.3, 0.15);
+            treeMat.specularColor = new BABYLON.Color3(0, 0, 0);
+            tree.material = treeMat;
+        }
     }
 }

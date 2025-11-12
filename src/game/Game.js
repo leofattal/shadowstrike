@@ -112,14 +112,20 @@ export class Game {
     }
 
     update(deltaTime) {
-        // Update player
-        if (this.player) {
-            this.player.update(deltaTime);
+        // Apply time scale for slow-motion effects
+        let scaledDelta = deltaTime;
+        if (this.player && this.player.timeScale !== 1.0) {
+            scaledDelta = deltaTime * this.player.timeScale;
         }
 
-        // Update enemies
+        // Update player
+        if (this.player) {
+            this.player.update(deltaTime); // Player uses real time
+        }
+
+        // Update enemies with scaled time
         if (this.enemyManager) {
-            this.enemyManager.update(deltaTime);
+            this.enemyManager.update(scaledDelta);
         }
 
         // Update UI
