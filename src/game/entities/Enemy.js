@@ -235,6 +235,7 @@ export class Enemy {
         // Store head reference for headshot detection
         this.headMesh = head;
         head.isHeadshot = true;
+        helmet.isHeadshot = true; // Mark helmet as headshot too
 
         // Create health bar above enemy
         this.createHealthBar();
