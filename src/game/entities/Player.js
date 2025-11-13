@@ -426,30 +426,40 @@ export class Player {
                 bullet.position.addInPlace(movement);
                 distanceTraveled += movement.length();
 
-                // Orient bullet to direction of travel
-                bullet.rotation.x = Math.PI / 2;
-                const lookAt = bullet.position.add(direction);
-                bullet.lookAt(lookAt);
+                // Orient bullet to direction of travel - point along direction vector
+                const targetLookAt = bullet.position.add(direction);
+                bullet.lookAt(targetLookAt);
 
                 // Position camera to the side for cinematic angle
                 // Camera is to the side, looking at the bullet from side view
-                const sideOffset = right.scale(1.5); // Further to the side for better view
-                const heightOffset = up.scale(0.4); // Slightly above
-                const behindOffset = direction.scale(-0.3); // Slightly behind
+                const sideOffset = right.scale(2.0); // Further to the side to see both bullet and enemy
+                const heightOffset = new BABYLON.Vector3(0, 0.5, 0); // Slightly above
 
-                bulletCam.position = bullet.position.add(sideOffset).add(heightOffset).add(behindOffset);
-                bulletCam.setTarget(bullet.position); // Look directly at bullet
+                bulletCam.position = bullet.position.add(sideOffset).add(heightOffset);
+
+                // Camera looks ahead toward target to show both bullet and enemy
+                const lookAheadPoint = bullet.position.add(direction.scale(5));
+                bulletCam.setTarget(lookAheadPoint);
             } else if (!piercingPhase) {
                 // Start piercing phase - close up of bullet entering head
                 piercingPhase = true;
                 piercingStartTime = performance.now();
 
-                // Position camera very close to show bullet piercing head
-                const enemyPos = hit.pickedPoint;
-                bulletCam.position = enemyPos.add(right.scale(0.3)).add(new BABYLON.Vector3(0, 0, 0));
-                bulletCam.setTarget(enemyPos);
+                // Get enemy position
+                let enemyComponent = hit.pickedMesh.enemyComponent;
+                if (!enemyComponent && hit.pickedMesh.parent) {
+                    enemyComponent = hit.pickedMesh.parent.enemyComponent;
+                }
 
-                // Continue bullet movement through head
+                // Position camera to show bullet entering head from side
+                const enemyPos = enemyComponent ? enemyComponent.mesh.position : hit.pickedPoint;
+                const headPos = enemyPos.add(new BABYLON.Vector3(0, 1.8, 0));
+
+                // Camera to side of head, looking at head
+                bulletCam.position = headPos.add(right.scale(1.2)).add(new BABYLON.Vector3(0, 0.2, 0));
+                bulletCam.setTarget(headPos);
+
+                // Position bullet just before head
                 bullet.position = targetPoint.subtract(direction.scale(0.3));
             } else if (piercingPhase && !bulletHit) {
                 // Piercing animation - bullet going through head
@@ -461,13 +471,19 @@ export class Player {
                     const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
                     bullet.position.addInPlace(movement);
 
-                    // Orient bullet
-                    bullet.rotation.x = Math.PI / 2;
-                    const lookAt = bullet.position.add(direction);
-                    bullet.lookAt(lookAt);
+                    // Orient bullet to direction of travel
+                    const targetLookAt = bullet.position.add(direction);
+                    bullet.lookAt(targetLookAt);
 
-                    // Keep camera close up on piercing point
-                    bulletCam.setTarget(bullet.position);
+                    // Keep camera focused on the head area to see piercing
+                    let enemyComponent = hit.pickedMesh.enemyComponent;
+                    if (!enemyComponent && hit.pickedMesh.parent) {
+                        enemyComponent = hit.pickedMesh.parent.enemyComponent;
+                    }
+                    if (enemyComponent) {
+                        const headPos = enemyComponent.mesh.position.add(new BABYLON.Vector3(0, 1.8, 0));
+                        bulletCam.setTarget(headPos);
+                    }
                 } else {
                     // Piercing complete, now show impact
                     bulletHit = true;
