@@ -352,14 +352,14 @@ export class Player {
     }
 
     createBulletCam(origin, direction, hit) {
-        // Trigger slow motion immediately
-        this.triggerSlowMotion();
+        // Set slow motion immediately for entire sequence
+        this.timeScale = 0.15; // Very slow motion (15% speed) for entire sequence
 
-        // Create visible bullet with tracer effect
+        // Create visible bullet with tracer effect - make it bigger so it's easier to see
         const bullet = BABYLON.MeshBuilder.CreateCylinder('bullet', {
-            height: 0.08,
-            diameterTop: 0.015,
-            diameterBottom: 0.015,
+            height: 0.12,
+            diameterTop: 0.02,
+            diameterBottom: 0.02,
             tessellation: 8
         }, this.scene);
 
@@ -384,8 +384,7 @@ export class Player {
         // Calculate bullet travel distance and time
         const targetPoint = hit.pickedPoint;
         const distance = BABYLON.Vector3.Distance(origin, targetPoint);
-        const bulletSpeed = 200; // Units per second (slowed by timeScale)
-        const travelTime = (distance / bulletSpeed) * 1000; // Convert to milliseconds
+        const bulletSpeed = 200; // Units per second (will be affected by timeScale)
 
         // Animate bullet
         let startTime = performance.now();
@@ -397,26 +396,27 @@ export class Player {
 
         let bulletHit = false;
         let impactTime = 0;
+        let distanceTraveled = 0;
 
         const bulletUpdate = () => {
-            const elapsed = (performance.now() - startTime) / 1000;
-            const progress = Math.min(elapsed / (travelTime / 1000), 1.0);
-
-            if (progress < 1.0) {
+            if (distanceTraveled < distance) {
+                // Bullet is still traveling
                 // Update bullet position (affected by timeScale)
                 const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
-                bullet.position.addInPlace(bulletVelocity.scale(scaledDelta * this.timeScale));
+                const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
+                bullet.position.addInPlace(movement);
+                distanceTraveled += movement.length();
 
                 // Orient bullet to direction of travel
                 bullet.rotation.x = Math.PI / 2;
                 const lookAt = bullet.position.add(direction);
                 bullet.lookAt(lookAt);
 
-                // Position camera to the side and slightly above for cinematic angle
-                // Camera follows bullet from the side, close up
-                const sideOffset = right.scale(0.5); // Close to bullet, to the side
-                const heightOffset = up.scale(0.2); // Slightly above
-                const behindOffset = direction.scale(-0.3); // Slightly behind
+                // Position camera to the side for cinematic angle
+                // Camera is to the side, looking at the bullet from side view
+                const sideOffset = right.scale(1.0); // Further to the side for better view
+                const heightOffset = up.scale(0.3); // Slightly above
+                const behindOffset = direction.scale(-0.2); // Slightly behind
 
                 bulletCam.position = bullet.position.add(sideOffset).add(heightOffset).add(behindOffset);
                 bulletCam.setTarget(bullet.position.add(direction.scale(2))); // Look ahead of bullet
@@ -452,8 +452,8 @@ export class Player {
                     const toEnemy = enemyPos.subtract(origin).normalize();
                     const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
 
-                    // Camera positioned to side of enemy at head height
-                    bulletCam.position = enemyPos.add(enemyRight.scale(3)).add(new BABYLON.Vector3(0, 1.5, 0));
+                    // Camera positioned to side of enemy at head height for death view
+                    bulletCam.position = enemyPos.add(enemyRight.scale(4)).add(new BABYLON.Vector3(0, 1.8, 0));
                     bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
                 }
 
@@ -465,15 +465,14 @@ export class Player {
                 // Clean up bullet
                 bullet.dispose();
 
-                // Extend slow motion for death animation
-                this.timeScale = 0.2; // Even slower for death
-                setTimeout(() => { this.timeScale = 1.0; }, 2000); // 2 seconds of slow-mo death
+                // Keep slow motion for death animation - 5 seconds total view time
+                setTimeout(() => { this.timeScale = 1.0; }, 5000); // 5 seconds of slow-mo death
             } else {
-                // Watch death animation in slow motion
+                // Watch death animation in slow motion for 5 seconds
                 const deathElapsed = (performance.now() - impactTime) / 1000;
 
-                if (deathElapsed > 2.0) {
-                    // End of death animation
+                if (deathElapsed > 5.0) {
+                    // End of death animation viewing
                     this.scene.unregisterAfterRender(bulletUpdate);
 
                     // Restore original camera
