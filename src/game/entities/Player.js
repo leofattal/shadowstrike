@@ -408,8 +408,6 @@ export class Player {
                 const cameraOffset = direction.scale(-2).add(new BABYLON.Vector3(0, 0.5, 0));
                 bulletCam.position = bullet.position.add(cameraOffset);
                 bulletCam.setTarget(bullet.position.add(direction.scale(5)));
-
-                this.scene.registerAfterRender(bulletUpdate);
             } else {
                 // Bullet reached target
                 this.scene.unregisterAfterRender(bulletUpdate);

@@ -654,8 +654,6 @@ export class Enemy {
                         }
                     });
                 }
-
-                this.scene.registerAfterRender(deathAnimation);
             } else {
                 this.scene.unregisterAfterRender(deathAnimation);
             }
