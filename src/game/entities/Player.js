@@ -355,18 +355,35 @@ export class Player {
         // Set slow motion immediately for entire sequence
         this.timeScale = 0.15; // Very slow motion (15% speed) for entire sequence
 
-        // Create visible bullet with tracer effect - make it bigger so it's easier to see
+        // Create visible bullet - MUCH bigger and more visible
         const bullet = BABYLON.MeshBuilder.CreateCylinder('bullet', {
-            height: 0.12,
-            diameterTop: 0.02,
-            diameterBottom: 0.02,
-            tessellation: 8
+            height: 0.3,
+            diameterTop: 0.05,
+            diameterBottom: 0.05,
+            tessellation: 16
         }, this.scene);
 
         const bulletMaterial = new BABYLON.StandardMaterial('bulletMat', this.scene);
-        bulletMaterial.emissiveColor = new BABYLON.Color3(1, 0.8, 0.2);
-        bulletMaterial.disableLighting = true;
+        bulletMaterial.emissiveColor = new BABYLON.Color3(2, 1.5, 0.5); // Brighter glow
+        bulletMaterial.diffuseColor = new BABYLON.Color3(1, 0.8, 0.2);
+        bulletMaterial.specularColor = new BABYLON.Color3(1, 1, 0.5);
+        bulletMaterial.disableLighting = false;
         bullet.material = bulletMaterial;
+
+        // Add tracer glow effect behind bullet
+        const tracer = BABYLON.MeshBuilder.CreateCylinder('tracer', {
+            height: 0.8,
+            diameterTop: 0.02,
+            diameterBottom: 0.08,
+            tessellation: 8
+        }, this.scene);
+        const tracerMaterial = new BABYLON.StandardMaterial('tracerMat', this.scene);
+        tracerMaterial.emissiveColor = new BABYLON.Color3(1, 0.5, 0);
+        tracerMaterial.alpha = 0.6;
+        tracerMaterial.disableLighting = true;
+        tracer.material = tracerMaterial;
+        tracer.parent = bullet;
+        tracer.position = new BABYLON.Vector3(0, -0.4, 0);
 
         bullet.position = origin.clone();
 
@@ -397,10 +414,12 @@ export class Player {
         let bulletHit = false;
         let impactTime = 0;
         let distanceTraveled = 0;
+        let piercingPhase = false;
+        let piercingStartTime = 0;
 
         const bulletUpdate = () => {
-            if (distanceTraveled < distance) {
-                // Bullet is still traveling
+            if (distanceTraveled < distance - 0.5 && !piercingPhase) {
+                // Bullet is still traveling to target
                 // Update bullet position (affected by timeScale)
                 const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
                 const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
@@ -414,59 +433,90 @@ export class Player {
 
                 // Position camera to the side for cinematic angle
                 // Camera is to the side, looking at the bullet from side view
-                const sideOffset = right.scale(1.0); // Further to the side for better view
-                const heightOffset = up.scale(0.3); // Slightly above
-                const behindOffset = direction.scale(-0.2); // Slightly behind
+                const sideOffset = right.scale(1.5); // Further to the side for better view
+                const heightOffset = up.scale(0.4); // Slightly above
+                const behindOffset = direction.scale(-0.3); // Slightly behind
 
                 bulletCam.position = bullet.position.add(sideOffset).add(heightOffset).add(behindOffset);
-                bulletCam.setTarget(bullet.position.add(direction.scale(2))); // Look ahead of bullet
-            } else if (!bulletHit) {
-                // Bullet just hit target
-                bulletHit = true;
-                impactTime = performance.now();
+                bulletCam.setTarget(bullet.position); // Look directly at bullet
+            } else if (!piercingPhase) {
+                // Start piercing phase - close up of bullet entering head
+                piercingPhase = true;
+                piercingStartTime = performance.now();
 
-                // Create bullet impact effect
-                this.createBulletImpact(targetPoint);
+                // Position camera very close to show bullet piercing head
+                const enemyPos = hit.pickedPoint;
+                bulletCam.position = enemyPos.add(right.scale(0.3)).add(new BABYLON.Vector3(0, 0, 0));
+                bulletCam.setTarget(enemyPos);
 
-                // Damage the enemy
-                let enemyComponent = hit.pickedMesh.enemyComponent;
-                if (!enemyComponent && hit.pickedMesh.parent) {
-                    enemyComponent = hit.pickedMesh.parent.enemyComponent;
-                }
+                // Continue bullet movement through head
+                bullet.position = targetPoint.subtract(direction.scale(0.3));
+            } else if (piercingPhase && !bulletHit) {
+                // Piercing animation - bullet going through head
+                const piercingElapsed = (performance.now() - piercingStartTime) / 1000;
 
-                if (enemyComponent) {
-                    const wasHeadshot = enemyComponent.takeDamage(this.damage, true);
+                if (piercingElapsed < 0.5) {
+                    // Move bullet through head slowly
+                    const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
+                    const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
+                    bullet.position.addInPlace(movement);
 
-                    // Show hit marker
-                    if (this.onEnemyHit) {
-                        this.onEnemyHit(wasHeadshot);
+                    // Orient bullet
+                    bullet.rotation.x = Math.PI / 2;
+                    const lookAt = bullet.position.add(direction);
+                    bullet.lookAt(lookAt);
+
+                    // Keep camera close up on piercing point
+                    bulletCam.setTarget(bullet.position);
+                } else {
+                    // Piercing complete, now show impact
+                    bulletHit = true;
+                    impactTime = performance.now();
+
+                    // Create bullet impact effect
+                    this.createBulletImpact(targetPoint);
+
+                    // Damage the enemy
+                    let enemyComponent = hit.pickedMesh.enemyComponent;
+                    if (!enemyComponent && hit.pickedMesh.parent) {
+                        enemyComponent = hit.pickedMesh.parent.enemyComponent;
                     }
 
-                    // Check if enemy died
-                    if (!enemyComponent.alive) {
-                        this.registerKill(wasHeadshot);
+                    if (enemyComponent) {
+                        const wasHeadshot = enemyComponent.takeDamage(this.damage, true);
+
+                        // Show hit marker
+                        if (this.onEnemyHit) {
+                            this.onEnemyHit(wasHeadshot);
+                        }
+
+                        // Check if enemy died
+                        if (!enemyComponent.alive) {
+                            this.registerKill(wasHeadshot);
+                        }
+
+                        // Position camera to view the death from the side
+                        const enemyPos = enemyComponent.mesh.position;
+                        const toEnemy = enemyPos.subtract(origin).normalize();
+                        const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
+
+                        // Camera positioned to side of enemy at head height for death view
+                        bulletCam.position = enemyPos.add(enemyRight.scale(4)).add(new BABYLON.Vector3(0, 1.8, 0));
+                        bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
                     }
 
-                    // Position camera to view the death from the side
-                    const enemyPos = enemyComponent.mesh.position;
-                    const toEnemy = enemyPos.subtract(origin).normalize();
-                    const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
+                    // Handle explosive ammo
+                    if (this.weaponStats.hasExplosiveAmmo) {
+                        this.createExplosion(targetPoint);
+                    }
 
-                    // Camera positioned to side of enemy at head height for death view
-                    bulletCam.position = enemyPos.add(enemyRight.scale(4)).add(new BABYLON.Vector3(0, 1.8, 0));
-                    bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
+                    // Clean up bullet
+                    bullet.dispose();
+                    tracer.dispose();
+
+                    // Keep slow motion for death animation - 5 seconds total view time
+                    setTimeout(() => { this.timeScale = 1.0; }, 5000); // 5 seconds of slow-mo death
                 }
-
-                // Handle explosive ammo
-                if (this.weaponStats.hasExplosiveAmmo) {
-                    this.createExplosion(targetPoint);
-                }
-
-                // Clean up bullet
-                bullet.dispose();
-
-                // Keep slow motion for death animation - 5 seconds total view time
-                setTimeout(() => { this.timeScale = 1.0; }, 5000); // 5 seconds of slow-mo death
             } else {
                 // Watch death animation in slow motion for 5 seconds
                 const deathElapsed = (performance.now() - impactTime) / 1000;
