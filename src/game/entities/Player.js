@@ -547,6 +547,34 @@ export class Player {
         };
 
         this.scene.registerAfterRender(bulletUpdate);
+
+        // Safety timeout - force end bullet cam after 10 seconds to prevent freezing
+        setTimeout(() => {
+            this.scene.unregisterAfterRender(bulletUpdate);
+
+            // Restore original camera if not already restored
+            if (this.scene.activeCamera !== originalCamera) {
+                this.scene.activeCamera = originalCamera;
+            }
+
+            // Clean up bullet cam
+            if (bulletCam) {
+                bulletCam.dispose();
+            }
+
+            // Clean up bullet if still exists
+            if (bullet && !bullet.isDisposed()) {
+                bullet.dispose();
+            }
+            if (tracer && !tracer.isDisposed()) {
+                tracer.dispose();
+            }
+
+            // Reset time scale
+            this.timeScale = 1.0;
+
+            console.log('Bullet cam safety timeout - force ended');
+        }, 10000);
     }
 
     createMuzzleFlash() {
@@ -753,10 +781,24 @@ export class Player {
         this.reserveAmmo = this.weaponStats.reserveAmmo;
         this.isReloading = false;
 
-        // Reset position
+        // Reset time scale in case stuck in slow motion
+        this.timeScale = 1.0;
+
+        // Make sure active camera is player camera (not bullet cam)
+        if (this.camera && this.scene.activeCamera !== this.camera) {
+            this.scene.activeCamera = this.camera;
+        }
+
+        // Reset position - MUST set mesh position and reset velocity
         if (this.mesh) {
             this.mesh.position = position.clone();
+            console.log('Respawning player at:', position);
         }
+
+        // Reset velocity to prevent being stuck
+        this.velocity = new BABYLON.Vector3(0, 0, 0);
+        this.isGrounded = false;
+        this.isClimbingLadder = false;
 
         // Reset camera rotation
         this.cameraPitch = 0;
