@@ -355,37 +355,35 @@ export class Player {
         // Set slow motion immediately for entire sequence
         this.timeScale = 0.15; // Very slow motion (15% speed) for entire sequence
 
-        // Create visible bullet - MUCH bigger and more visible
-        const bullet = BABYLON.MeshBuilder.CreateCylinder('bullet', {
-            height: 0.3,
-            diameterTop: 0.05,
-            diameterBottom: 0.05,
-            tessellation: 16
+        // Create visible bullet - EXTREMELY visible sphere
+        const bullet = BABYLON.MeshBuilder.CreateSphere('bullet', {
+            diameter: 0.3,
+            segments: 16
         }, this.scene);
 
         const bulletMaterial = new BABYLON.StandardMaterial('bulletMat', this.scene);
-        bulletMaterial.emissiveColor = new BABYLON.Color3(2, 1.5, 0.5); // Brighter glow
-        bulletMaterial.diffuseColor = new BABYLON.Color3(1, 0.8, 0.2);
-        bulletMaterial.specularColor = new BABYLON.Color3(1, 1, 0.5);
-        bulletMaterial.disableLighting = false;
+        bulletMaterial.emissiveColor = new BABYLON.Color3(5, 3, 1); // SUPER bright glow
+        bulletMaterial.diffuseColor = new BABYLON.Color3(1, 1, 0);
+        bulletMaterial.disableLighting = true; // Always visible regardless of lighting
         bullet.material = bulletMaterial;
 
-        // Add tracer glow effect behind bullet
-        const tracer = BABYLON.MeshBuilder.CreateCylinder('tracer', {
-            height: 0.8,
-            diameterTop: 0.02,
-            diameterBottom: 0.08,
-            tessellation: 8
+        // Add giant glowing tracer trail behind bullet
+        const tracer = BABYLON.MeshBuilder.CreateSphere('tracer', {
+            diameter: 0.5,
+            segments: 8
         }, this.scene);
         const tracerMaterial = new BABYLON.StandardMaterial('tracerMat', this.scene);
-        tracerMaterial.emissiveColor = new BABYLON.Color3(1, 0.5, 0);
-        tracerMaterial.alpha = 0.6;
+        tracerMaterial.emissiveColor = new BABYLON.Color3(3, 1.5, 0);
+        tracerMaterial.alpha = 0.7;
         tracerMaterial.disableLighting = true;
         tracer.material = tracerMaterial;
         tracer.parent = bullet;
-        tracer.position = new BABYLON.Vector3(0, -0.4, 0);
+        tracer.position = new BABYLON.Vector3(0, 0, 0);
+        tracer.scaling = new BABYLON.Vector3(1.5, 1.5, 1.5);
 
         bullet.position = origin.clone();
+
+        console.log('Bullet created at:', bullet.position);
 
         // Create bullet camera positioned to the side
         const bulletCam = new BABYLON.FreeCamera('bulletCam', origin.clone(), this.scene);
@@ -426,20 +424,20 @@ export class Player {
                 bullet.position.addInPlace(movement);
                 distanceTraveled += movement.length();
 
-                // Orient bullet to direction of travel - point along direction vector
-                const targetLookAt = bullet.position.add(direction);
-                bullet.lookAt(targetLookAt);
+                console.log('Bullet position:', bullet.position, 'Distance traveled:', distanceTraveled);
 
-                // Position camera to the side for cinematic angle
-                // Camera is to the side, looking at the bullet from side view
-                const sideOffset = right.scale(2.0); // Further to the side to see both bullet and enemy
-                const heightOffset = new BABYLON.Vector3(0, 0.5, 0); // Slightly above
+                // Make bullet visible and always render
+                bullet.isVisible = true;
+                bullet.visibility = 1.0;
+
+                // Position camera MUCH closer to bullet and looking directly at it
+                const sideOffset = right.scale(0.8); // Close to bullet
+                const heightOffset = new BABYLON.Vector3(0, 0.3, 0); // Slightly above
 
                 bulletCam.position = bullet.position.add(sideOffset).add(heightOffset);
 
-                // Camera looks ahead toward target to show both bullet and enemy
-                const lookAheadPoint = bullet.position.add(direction.scale(5));
-                bulletCam.setTarget(lookAheadPoint);
+                // Camera looks directly at bullet and slightly ahead
+                bulletCam.setTarget(bullet.position.add(direction.scale(1)));
             } else if (!piercingPhase) {
                 // Start piercing phase - close up of bullet entering head
                 piercingPhase = true;
