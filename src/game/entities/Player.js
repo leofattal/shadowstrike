@@ -352,14 +352,14 @@ export class Player {
     }
 
     createBulletCam(origin, direction, hit) {
-        // Trigger slow motion
+        // Trigger slow motion immediately
         this.triggerSlowMotion();
 
-        // Create visible bullet
+        // Create visible bullet with tracer effect
         const bullet = BABYLON.MeshBuilder.CreateCylinder('bullet', {
-            height: 0.05,
-            diameterTop: 0.01,
-            diameterBottom: 0.01,
+            height: 0.08,
+            diameterTop: 0.015,
+            diameterBottom: 0.015,
             tessellation: 8
         }, this.scene);
 
@@ -370,15 +370,16 @@ export class Player {
 
         bullet.position = origin.clone();
 
-        // Create bullet camera
+        // Create bullet camera positioned to the side
         const bulletCam = new BABYLON.FreeCamera('bulletCam', origin.clone(), this.scene);
-        bulletCam.setTarget(origin.add(direction.scale(5)));
 
         // Store original camera
         const originalCamera = this.scene.activeCamera;
 
-        // Switch to bullet cam
-        this.scene.activeCamera = bulletCam;
+        // Switch to bullet cam after brief delay to show bullet leaving gun
+        setTimeout(() => {
+            this.scene.activeCamera = bulletCam;
+        }, 100);
 
         // Calculate bullet travel distance and time
         const targetPoint = hit.pickedPoint;
@@ -389,6 +390,13 @@ export class Player {
         // Animate bullet
         let startTime = performance.now();
         const bulletVelocity = direction.scale(bulletSpeed);
+
+        // Calculate perpendicular vector for side camera angle
+        const right = BABYLON.Vector3.Cross(direction, BABYLON.Vector3.Up()).normalize();
+        const up = BABYLON.Vector3.Cross(right, direction).normalize();
+
+        let bulletHit = false;
+        let impactTime = 0;
 
         const bulletUpdate = () => {
             const elapsed = (performance.now() - startTime) / 1000;
@@ -404,13 +412,18 @@ export class Player {
                 const lookAt = bullet.position.add(direction);
                 bullet.lookAt(lookAt);
 
-                // Update camera to follow bullet
-                const cameraOffset = direction.scale(-2).add(new BABYLON.Vector3(0, 0.5, 0));
-                bulletCam.position = bullet.position.add(cameraOffset);
-                bulletCam.setTarget(bullet.position.add(direction.scale(5)));
-            } else {
-                // Bullet reached target
-                this.scene.unregisterAfterRender(bulletUpdate);
+                // Position camera to the side and slightly above for cinematic angle
+                // Camera follows bullet from the side, close up
+                const sideOffset = right.scale(0.5); // Close to bullet, to the side
+                const heightOffset = up.scale(0.2); // Slightly above
+                const behindOffset = direction.scale(-0.3); // Slightly behind
+
+                bulletCam.position = bullet.position.add(sideOffset).add(heightOffset).add(behindOffset);
+                bulletCam.setTarget(bullet.position.add(direction.scale(2))); // Look ahead of bullet
+            } else if (!bulletHit) {
+                // Bullet just hit target
+                bulletHit = true;
+                impactTime = performance.now();
 
                 // Create bullet impact effect
                 this.createBulletImpact(targetPoint);
@@ -433,6 +446,15 @@ export class Player {
                     if (!enemyComponent.alive) {
                         this.registerKill(wasHeadshot);
                     }
+
+                    // Position camera to view the death from the side
+                    const enemyPos = enemyComponent.mesh.position;
+                    const toEnemy = enemyPos.subtract(origin).normalize();
+                    const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
+
+                    // Camera positioned to side of enemy at head height
+                    bulletCam.position = enemyPos.add(enemyRight.scale(3)).add(new BABYLON.Vector3(0, 1.5, 0));
+                    bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
                 }
 
                 // Handle explosive ammo
@@ -443,11 +465,21 @@ export class Player {
                 // Clean up bullet
                 bullet.dispose();
 
-                // Wait a moment then restore original camera
-                setTimeout(() => {
+                // Extend slow motion for death animation
+                this.timeScale = 0.2; // Even slower for death
+                setTimeout(() => { this.timeScale = 1.0; }, 2000); // 2 seconds of slow-mo death
+            } else {
+                // Watch death animation in slow motion
+                const deathElapsed = (performance.now() - impactTime) / 1000;
+
+                if (deathElapsed > 2.0) {
+                    // End of death animation
+                    this.scene.unregisterAfterRender(bulletUpdate);
+
+                    // Restore original camera
                     this.scene.activeCamera = originalCamera;
                     bulletCam.dispose();
-                }, 300);
+                }
             }
         };
 
