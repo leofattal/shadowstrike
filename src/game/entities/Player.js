@@ -118,11 +118,13 @@ export class Player {
             'shootSound',
             'sniper-lourd-headshot-fortnite.mp3',
             this.scene,
-            null,
+            () => {
+                console.log('Shoot sound loaded successfully');
+            },
             {
                 loop: false,
                 autoplay: false,
-                volume: 0.5
+                volume: 1.0
             }
         );
 
@@ -131,11 +133,13 @@ export class Player {
             'reloadSound',
             'gunreload.mp3',
             this.scene,
-            null,
+            () => {
+                console.log('Reload sound loaded successfully');
+            },
             {
                 loop: false,
                 autoplay: false,
-                volume: 0.6
+                volume: 1.0
             }
         );
     }
@@ -299,7 +303,10 @@ export class Player {
 
         // Play shooting sound
         if (this.shootSound) {
+            console.log('Playing shoot sound...');
             this.shootSound.play();
+        } else {
+            console.log('Shoot sound not loaded!');
         }
 
         // Create muzzle flash particle effect
@@ -725,7 +732,10 @@ export class Player {
 
         // Play reload sound
         if (this.reloadSound) {
+            console.log('Playing reload sound...');
             this.reloadSound.play();
+        } else {
+            console.log('Reload sound not loaded!');
         }
 
         console.log('Reloading...');
