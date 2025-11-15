@@ -430,14 +430,14 @@ export class Player {
                 bullet.isVisible = true;
                 bullet.visibility = 1.0;
 
-                // Position camera MUCH closer to bullet and looking directly at it
-                const sideOffset = right.scale(0.8); // Close to bullet
-                const heightOffset = new BABYLON.Vector3(0, 0.3, 0); // Slightly above
+                // Position camera BEHIND the bullet following it
+                const behindOffset = direction.scale(-1.5); // 1.5 units behind bullet
+                const heightOffset = new BABYLON.Vector3(0, 0.2, 0); // Slightly above
 
-                bulletCam.position = bullet.position.add(sideOffset).add(heightOffset);
+                bulletCam.position = bullet.position.add(behindOffset).add(heightOffset);
 
-                // Camera looks directly at bullet and slightly ahead
-                bulletCam.setTarget(bullet.position.add(direction.scale(1)));
+                // Camera looks forward in the direction the bullet is traveling
+                bulletCam.setTarget(bullet.position.add(direction.scale(10)));
             } else if (!piercingPhase) {
                 // Start piercing phase - close up of bullet entering head
                 piercingPhase = true;
