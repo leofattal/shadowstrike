@@ -19,10 +19,11 @@ export class Enemy {
         // Combat properties
         this.fireRate = 0.5; // Shoot every 0.5 seconds
         this.lastShotTime = 0;
-        this.damage = 10;
+        this.damage = 5; // Reduced damage (was 10)
 
         this.mesh = null;
         this.healthBar = null;
+        this.activeBullets = []; // Track flying bullets
 
         this.createMesh(position);
         this.setupPatrol(position);
@@ -274,7 +275,10 @@ export class Enemy {
     update(deltaTime) {
         if (!this.alive) return;
 
-        // Freeze enemy during bullet cam replay
+        // Always update bullets (they still fly during bullet cam, but in slow motion)
+        this.updateBullets(deltaTime);
+
+        // Freeze enemy AI during bullet cam replay
         if (this.player.bulletCamActive) {
             return; // Don't update AI, movement, or shooting during replay
         }
@@ -363,70 +367,120 @@ export class Enemy {
         const isCrouching = this.player.isCrouching || false;
         const targetHeight = isCrouching ? 1.6 : (this.player.camera ? this.player.camera.position.y : 1.0);
         const playerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, targetHeight, 0));
-        const direction = playerCenter.subtract(weaponWorldPos).normalize();
+        let direction = playerCenter.subtract(weaponWorldPos).normalize();
 
-        // First, check if there are any obstacles between enemy and player
-        const ray = new BABYLON.Ray(weaponWorldPos, direction, 100);
+        // Add random spread for bad aim (enemies aren't perfect shots)
+        const spreadAmount = 0.15; // Increase for worse aim
+        const randomSpread = new BABYLON.Vector3(
+            (Math.random() - 0.5) * spreadAmount,
+            (Math.random() - 0.5) * spreadAmount,
+            (Math.random() - 0.5) * spreadAmount
+        );
+        direction = direction.add(randomSpread).normalize();
 
-        const obstacleCheck = this.scene.pickWithRay(ray, (mesh) => {
-            // Check for level geometry (walls, floors, etc.) but not enemies or player
-            return mesh.checkCollisions &&
-                   !mesh.name.startsWith('enemy') &&
-                   mesh.name !== 'player' &&
-                   mesh !== this.player.mesh;
+        // Create visible bullet projectile
+        const bullet = BABYLON.MeshBuilder.CreateSphere('enemyBullet', {
+            diameter: 0.15,
+            segments: 8
+        }, this.scene);
+
+        const bulletMaterial = new BABYLON.StandardMaterial('enemyBulletMat', this.scene);
+        bulletMaterial.emissiveColor = new BABYLON.Color3(3, 1, 0); // Orange glow
+        bulletMaterial.disableLighting = true;
+        bullet.material = bulletMaterial;
+
+        bullet.position = weaponWorldPos.clone();
+
+        // Add tracer trail
+        const tracer = BABYLON.MeshBuilder.CreateSphere('enemyTracer', {
+            diameter: 0.25,
+            segments: 6
+        }, this.scene);
+        const tracerMaterial = new BABYLON.StandardMaterial('enemyTracerMat', this.scene);
+        tracerMaterial.emissiveColor = new BABYLON.Color3(2, 0.5, 0);
+        tracerMaterial.alpha = 0.6;
+        tracerMaterial.disableLighting = true;
+        tracer.material = tracerMaterial;
+        tracer.parent = bullet;
+        tracer.position = new BABYLON.Vector3(0, 0, 0);
+
+        // Store bullet data
+        this.activeBullets.push({
+            mesh: bullet,
+            tracer: tracer,
+            direction: direction,
+            startPos: weaponWorldPos.clone(),
+            speed: 50, // Base bullet speed (units per second)
+            maxDistance: 100,
+            isCrouching: isCrouching
         });
 
-        // If we hit an obstacle before reaching the player, the shot is blocked
-        if (obstacleCheck && obstacleCheck.hit) {
-            const distanceToObstacle = BABYLON.Vector3.Distance(weaponWorldPos, obstacleCheck.pickedPoint);
-            const distanceToPlayer = BABYLON.Vector3.Distance(weaponWorldPos, playerCenter);
+        console.log('Enemy fired bullet at player');
+    }
 
-            if (distanceToObstacle < distanceToPlayer) {
-                console.log('Enemy shot blocked by obstacle:', obstacleCheck.pickedMesh.name);
+    updateBullets(deltaTime) {
+        // Apply time scale from player's bullet cam
+        const timeScale = this.player.timeScale || 1.0;
+        const scaledDelta = deltaTime * timeScale;
 
-                // Visualize enemy shot stopping at obstacle (orange ray)
-                const blockedRay = new BABYLON.Ray(weaponWorldPos, direction, distanceToObstacle);
-                const rayHelper = new BABYLON.RayHelper(blockedRay);
-                rayHelper.show(this.scene, new BABYLON.Color3(1, 0.5, 0));
-                setTimeout(() => rayHelper.hide(), 100);
+        for (let i = this.activeBullets.length - 1; i >= 0; i--) {
+            const bulletData = this.activeBullets[i];
+            const bullet = bulletData.mesh;
 
-                // Create bullet impact on wall
-                this.createBulletImpact(obstacleCheck.pickedPoint);
-                return;
+            // Move bullet
+            const movement = bulletData.direction.scale(bulletData.speed * scaledDelta);
+            bullet.position.addInPlace(movement);
+
+            // Check distance traveled
+            const distanceTraveled = BABYLON.Vector3.Distance(bullet.position, bulletData.startPos);
+            if (distanceTraveled > bulletData.maxDistance) {
+                // Bullet expired
+                bullet.dispose();
+                if (bulletData.tracer && !bulletData.tracer.isDisposed()) {
+                    bulletData.tracer.dispose();
+                }
+                this.activeBullets.splice(i, 1);
+                continue;
             }
-        }
 
-        // No obstacle blocking - show full ray to player
-        const rayHelper = new BABYLON.RayHelper(ray);
-        rayHelper.show(this.scene, new BABYLON.Color3(1, 0.5, 0));
-        setTimeout(() => rayHelper.hide(), 100);
+            // Check collision with walls/obstacles
+            const ray = new BABYLON.Ray(bullet.position, bulletData.direction, 0.5);
+            const obstacleCheck = this.scene.pickWithRay(ray, (mesh) => {
+                return mesh.checkCollisions &&
+                       !mesh.name.startsWith('enemy') &&
+                       mesh.name !== 'player' &&
+                       mesh !== this.player.mesh;
+            });
 
-        // No obstacle blocking, now check if ray intersects with player position
-        // Calculate closest point on ray to player's ACTUAL position
-        const actualPlayerHeight = this.player.camera ? this.player.camera.position.y : 1.0;
-        const actualPlayerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, actualPlayerHeight, 0));
-        const rayToPlayer = actualPlayerCenter.subtract(weaponWorldPos);
-        const rayDot = BABYLON.Vector3.Dot(rayToPlayer, direction);
+            if (obstacleCheck && obstacleCheck.hit) {
+                console.log('Enemy bullet hit obstacle:', obstacleCheck.pickedMesh.name);
+                this.createBulletImpact(bullet.position);
+                bullet.dispose();
+                if (bulletData.tracer && !bulletData.tracer.isDisposed()) {
+                    bulletData.tracer.dispose();
+                }
+                this.activeBullets.splice(i, 1);
+                continue;
+            }
 
-        if (rayDot > 0) { // Player is in front of the enemy
-            const closestPoint = weaponWorldPos.add(direction.scale(rayDot));
-            const distanceToRay = BABYLON.Vector3.Distance(closestPoint, actualPlayerCenter);
+            // Check collision with player
+            const actualPlayerHeight = this.player.camera ? this.player.camera.position.y : 1.0;
+            const actualPlayerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, actualPlayerHeight, 0));
+            const distanceToPlayer = BABYLON.Vector3.Distance(bullet.position, actualPlayerCenter);
 
-            // Check if ray passes close enough to player (within player radius)
-            // Much smaller hitbox when crouching - bullets should miss completely
-            const playerRadius = isCrouching ? 0.15 : 0.5; // Tiny hitbox when crouching
+            // Much smaller hitbox when crouching
+            const playerRadius = bulletData.isCrouching ? 0.15 : 0.5;
 
-            if (distanceToRay < playerRadius && rayDot < 100) { // Within 100 units
-                console.log('Enemy hit player for', this.damage, 'damage! Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching);
+            if (distanceToPlayer < playerRadius) {
+                console.log('Enemy bullet hit player for', this.damage, 'damage!');
                 this.player.takeDamage(this.damage);
-
-                // Create bullet impact on player
-                this.createBulletImpact(closestPoint);
-            } else {
-                console.log('Enemy shot missed player. Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching, 'Actual height:', actualPlayerHeight.toFixed(2));
+                this.createBulletImpact(bullet.position);
+                bullet.dispose();
+                if (bulletData.tracer && !bulletData.tracer.isDisposed()) {
+                    bulletData.tracer.dispose();
+                }
+                this.activeBullets.splice(i, 1);
             }
-        } else {
-            console.log('Enemy shot wrong direction');
         }
     }
 
