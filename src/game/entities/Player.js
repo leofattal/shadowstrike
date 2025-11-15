@@ -112,6 +112,32 @@ export class Player {
                 this.ladderTrigger.position.z - 0.5
             );
         }
+
+        // Load shooting sound
+        this.shootSound = new BABYLON.Sound(
+            'shootSound',
+            'sniper-lourd-headshot-fortnite.mp3',
+            this.scene,
+            null,
+            {
+                loop: false,
+                autoplay: false,
+                volume: 0.5
+            }
+        );
+
+        // Load reload sound
+        this.reloadSound = new BABYLON.Sound(
+            'reloadSound',
+            'gunreload.mp3',
+            this.scene,
+            null,
+            {
+                loop: false,
+                autoplay: false,
+                volume: 0.6
+            }
+        );
     }
 
     update(deltaTime) {
@@ -270,6 +296,11 @@ export class Player {
 
         this.lastShotTime = now;
         this.currentAmmo--;
+
+        // Play shooting sound
+        if (this.shootSound) {
+            this.shootSound.play();
+        }
 
         // Create muzzle flash particle effect
         this.createMuzzleFlash();
@@ -438,99 +469,54 @@ export class Player {
 
                 // Camera looks forward in the direction the bullet is traveling
                 bulletCam.setTarget(bullet.position.add(direction.scale(10)));
-            } else if (!piercingPhase) {
-                // Start piercing phase - close up of bullet entering head
-                piercingPhase = true;
-                piercingStartTime = performance.now();
+            } else if (!bulletHit) {
+                // Bullet reached target - impact and start death sequence
+                bulletHit = true;
+                impactTime = performance.now();
 
-                // Get enemy position
+                // Create bullet impact effect
+                this.createBulletImpact(targetPoint);
+
+                // Damage the enemy
                 let enemyComponent = hit.pickedMesh.enemyComponent;
                 if (!enemyComponent && hit.pickedMesh.parent) {
                     enemyComponent = hit.pickedMesh.parent.enemyComponent;
                 }
 
-                // Position camera to show bullet entering head from side
-                const enemyPos = enemyComponent ? enemyComponent.mesh.position : hit.pickedPoint;
-                const headPos = enemyPos.add(new BABYLON.Vector3(0, 1.8, 0));
+                if (enemyComponent) {
+                    const wasHeadshot = enemyComponent.takeDamage(this.damage, true);
 
-                // Camera to side of head, looking at head
-                bulletCam.position = headPos.add(right.scale(1.2)).add(new BABYLON.Vector3(0, 0.2, 0));
-                bulletCam.setTarget(headPos);
-
-                // Position bullet just before head
-                bullet.position = targetPoint.subtract(direction.scale(0.3));
-            } else if (piercingPhase && !bulletHit) {
-                // Piercing animation - bullet going through head
-                const piercingElapsed = (performance.now() - piercingStartTime) / 1000;
-
-                if (piercingElapsed < 0.5) {
-                    // Move bullet through head slowly
-                    const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
-                    const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
-                    bullet.position.addInPlace(movement);
-
-                    // Orient bullet to direction of travel
-                    const targetLookAt = bullet.position.add(direction);
-                    bullet.lookAt(targetLookAt);
-
-                    // Keep camera focused on the head area to see piercing
-                    let enemyComponent = hit.pickedMesh.enemyComponent;
-                    if (!enemyComponent && hit.pickedMesh.parent) {
-                        enemyComponent = hit.pickedMesh.parent.enemyComponent;
-                    }
-                    if (enemyComponent) {
-                        const headPos = enemyComponent.mesh.position.add(new BABYLON.Vector3(0, 1.8, 0));
-                        bulletCam.setTarget(headPos);
-                    }
-                } else {
-                    // Piercing complete, now show impact
-                    bulletHit = true;
-                    impactTime = performance.now();
-
-                    // Create bullet impact effect
-                    this.createBulletImpact(targetPoint);
-
-                    // Damage the enemy
-                    let enemyComponent = hit.pickedMesh.enemyComponent;
-                    if (!enemyComponent && hit.pickedMesh.parent) {
-                        enemyComponent = hit.pickedMesh.parent.enemyComponent;
+                    // Show hit marker
+                    if (this.onEnemyHit) {
+                        this.onEnemyHit(wasHeadshot);
                     }
 
-                    if (enemyComponent) {
-                        const wasHeadshot = enemyComponent.takeDamage(this.damage, true);
-
-                        // Show hit marker
-                        if (this.onEnemyHit) {
-                            this.onEnemyHit(wasHeadshot);
-                        }
-
-                        // Check if enemy died
-                        if (!enemyComponent.alive) {
-                            this.registerKill(wasHeadshot);
-                        }
-
-                        // Position camera to view the death from the side
-                        const enemyPos = enemyComponent.mesh.position;
-                        const toEnemy = enemyPos.subtract(origin).normalize();
-                        const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
-
-                        // Camera positioned to side of enemy at head height for death view
-                        bulletCam.position = enemyPos.add(enemyRight.scale(4)).add(new BABYLON.Vector3(0, 1.8, 0));
-                        bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
+                    // Check if enemy died
+                    if (!enemyComponent.alive) {
+                        this.registerKill(wasHeadshot);
                     }
 
-                    // Handle explosive ammo
-                    if (this.weaponStats.hasExplosiveAmmo) {
-                        this.createExplosion(targetPoint);
-                    }
+                    // Position camera to side of enemy for one continuous death shot
+                    const enemyPos = enemyComponent.mesh.position;
+                    const toEnemy = enemyPos.subtract(origin).normalize();
+                    const enemyRight = BABYLON.Vector3.Cross(toEnemy, BABYLON.Vector3.Up()).normalize();
 
-                    // Clean up bullet
-                    bullet.dispose();
-                    tracer.dispose();
-
-                    // Keep slow motion for death animation - 5 seconds total view time
-                    setTimeout(() => { this.timeScale = 1.0; }, 5000); // 5 seconds of slow-mo death
+                    // Camera positioned to side of enemy at head height
+                    bulletCam.position = enemyPos.add(enemyRight.scale(3.5)).add(new BABYLON.Vector3(0, 1.8, 0));
+                    bulletCam.setTarget(enemyPos.add(new BABYLON.Vector3(0, 1.5, 0)));
                 }
+
+                // Handle explosive ammo
+                if (this.weaponStats.hasExplosiveAmmo) {
+                    this.createExplosion(targetPoint);
+                }
+
+                // Clean up bullet
+                bullet.dispose();
+                tracer.dispose();
+
+                // Keep slow motion for entire death animation - 5 seconds total view time
+                setTimeout(() => { this.timeScale = 1.0; }, 5000);
             } else {
                 // Watch death animation in slow motion for 5 seconds
                 const deathElapsed = (performance.now() - impactTime) / 1000;
@@ -736,6 +722,12 @@ export class Player {
 
         this.isReloading = true;
         this.reloadTimer = 0;
+
+        // Play reload sound
+        if (this.reloadSound) {
+            this.reloadSound.play();
+        }
+
         console.log('Reloading...');
     }
 
