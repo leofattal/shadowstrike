@@ -28,9 +28,13 @@ export class Player {
         // Movement properties
         this.moveSpeed = 4.0;
         this.sprintSpeed = 7.0;
+        this.crouchSpeed = 2.0;
         this.jumpForce = 5.0;
         this.isGrounded = false;
+        this.isCrouching = false;
         this.velocity = new BABYLON.Vector3(0, 0, 0);
+        this.standingHeight = 1.6;
+        this.crouchHeight = 0.8;
 
         // Ladder climbing properties
         this.isClimbingLadder = false;
@@ -231,9 +235,29 @@ export class Player {
 
         const input = this.inputManager.getMovementInput();
 
-        // Get current speed
-        const isSprinting = this.inputManager.isSprintPressed();
-        const speed = isSprinting ? this.sprintSpeed : this.moveSpeed;
+        // Handle crouching
+        if (this.inputManager.isCrouchPressed()) {
+            if (!this.isCrouching) {
+                this.isCrouching = true;
+                // Lower camera
+                this.camera.position.y = this.crouchHeight;
+            }
+        } else {
+            if (this.isCrouching) {
+                this.isCrouching = false;
+                // Raise camera back up
+                this.camera.position.y = this.standingHeight;
+            }
+        }
+
+        // Get current speed based on state
+        const isSprinting = this.inputManager.isSprintPressed() && !this.isCrouching;
+        let speed = this.moveSpeed;
+        if (isSprinting) {
+            speed = this.sprintSpeed;
+        } else if (this.isCrouching) {
+            speed = this.crouchSpeed;
+        }
 
         // Calculate movement direction relative to camera
         const forward = this.mesh.forward.scale(input.forward);

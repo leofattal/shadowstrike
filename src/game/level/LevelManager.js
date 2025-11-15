@@ -60,18 +60,73 @@ export class LevelManager {
         const ground = BABYLON.MeshBuilder.CreateGround('ground', {
             width: 100,
             height: 100,
-            subdivisions: 20
+            subdivisions: 50 // More subdivisions for better detail
         }, this.scene);
 
         ground.checkCollisions = true;
         ground.receiveShadows = true;
 
-        // Create enhanced ground material
+        // Create realistic ground material with procedural texture
         const groundMaterial = new BABYLON.StandardMaterial('groundMat', this.scene);
-        groundMaterial.diffuseColor = new BABYLON.Color3(0.25, 0.28, 0.22);
-        groundMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-        groundMaterial.specularPower = 32;
-        groundMaterial.ambientColor = new BABYLON.Color3(0.15, 0.15, 0.15);
+
+        // Create procedural grass/dirt texture
+        const groundTexture = new BABYLON.DynamicTexture('groundTexture', 512, this.scene);
+        const ctx = groundTexture.getContext();
+
+        // Fill with base dirt color
+        ctx.fillStyle = '#3d5a2f';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Add grass texture with random green pixels
+        for (let i = 0; i < 10000; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const shade = 100 + Math.random() * 80;
+            ctx.fillStyle = `rgb(${shade * 0.4}, ${shade}, ${shade * 0.3})`;
+            ctx.fillRect(x, y, Math.random() * 3, Math.random() * 3);
+        }
+
+        // Add dirt patches
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const size = 10 + Math.random() * 20;
+            const brown = 80 + Math.random() * 40;
+            ctx.fillStyle = `rgb(${brown}, ${brown * 0.7}, ${brown * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        groundTexture.update();
+
+        groundMaterial.diffuseTexture = groundTexture;
+        groundMaterial.diffuseTexture.uScale = 10;
+        groundMaterial.diffuseTexture.vScale = 10;
+        groundMaterial.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        groundMaterial.specularPower = 64;
+        groundMaterial.ambientColor = new BABYLON.Color3(0.2, 0.25, 0.2);
+
+        // Add bump map for texture
+        const bumpTexture = new BABYLON.DynamicTexture('bumpTexture', 512, this.scene);
+        const bumpCtx = bumpTexture.getContext();
+        bumpCtx.fillStyle = '#808080';
+        bumpCtx.fillRect(0, 0, 512, 512);
+
+        // Add noise for bumps
+        for (let i = 0; i < 20000; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const brightness = 100 + Math.random() * 55;
+            bumpCtx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+            bumpCtx.fillRect(x, y, 1, 1);
+        }
+        bumpTexture.update();
+
+        groundMaterial.bumpTexture = bumpTexture;
+        groundMaterial.bumpTexture.uScale = 10;
+        groundMaterial.bumpTexture.vScale = 10;
+        groundMaterial.bumpTexture.level = 0.3;
 
         ground.material = groundMaterial;
 
