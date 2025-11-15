@@ -40,12 +40,34 @@ export class InputManager {
         // Pointer lock events
         document.addEventListener('pointerlockchange', () => {
             this.isPointerLocked = document.pointerLockElement === this.canvas;
+            console.log('Pointer lock changed:', this.isPointerLocked);
+
+            // If pointer lock was lost, try to reacquire it
+            if (!this.isPointerLocked && this.wasPointerLocked) {
+                console.log('Pointer lock lost, attempting to reacquire');
+                setTimeout(() => {
+                    this.requestPointerLock();
+                }, 100);
+            }
+
+            this.wasPointerLocked = this.isPointerLocked;
+        });
+
+        // Request pointer lock on canvas click
+        this.canvas.addEventListener('click', () => {
+            this.requestPointerLock();
         });
 
         // Prevent context menu
         this.canvas.addEventListener('contextmenu', (evt) => {
             evt.preventDefault();
         });
+    }
+
+    requestPointerLock() {
+        if (!this.isPointerLocked && this.canvas.requestPointerLock) {
+            this.canvas.requestPointerLock();
+        }
     }
 
     isKeyDown(code) {
@@ -65,6 +87,13 @@ export class InputManager {
     }
 
     getMouseDelta() {
+        // If pointer lock is not active, return zero delta to prevent camera jumps
+        if (!this.isPointerLocked) {
+            this.mouseDelta.x = 0;
+            this.mouseDelta.y = 0;
+            return { x: 0, y: 0 };
+        }
+
         const delta = { ...this.mouseDelta };
         this.mouseDelta.x = 0;
         this.mouseDelta.y = 0;

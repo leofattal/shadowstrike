@@ -146,6 +146,21 @@ export class Player {
                 volume: 1.0
             }
         );
+
+        // Load explosion sound
+        this.explosionSound = new BABYLON.Sound(
+            'explosionSound',
+            'rpg-roblox.mp3',
+            this.scene,
+            () => {
+                console.log('Explosion sound loaded successfully');
+            },
+            {
+                loop: false,
+                autoplay: false,
+                volume: 1.0
+            }
+        );
     }
 
     update(deltaTime) {
@@ -414,6 +429,13 @@ export class Player {
     }
 
     createBulletCam(origin, direction, hit) {
+        // Prevent multiple bullet cams running at once
+        if (this.bulletCamActive) {
+            console.log('Bullet cam already active, skipping');
+            return;
+        }
+        this.bulletCamActive = true;
+
         // Set slow motion immediately for entire sequence
         this.timeScale = 0.15; // Very slow motion (15% speed) for entire sequence
 
@@ -445,7 +467,7 @@ export class Player {
 
         bullet.position = origin.clone();
 
-        console.log('Bullet created at:', bullet.position);
+        console.log('Bullet cam started at:', bullet.position);
 
         // Create bullet camera positioned to the side
         const bulletCam = new BABYLON.FreeCamera('bulletCam', origin.clone(), this.scene);
@@ -455,7 +477,9 @@ export class Player {
 
         // Switch to bullet cam after brief delay to show bullet leaving gun
         setTimeout(() => {
-            this.scene.activeCamera = bulletCam;
+            if (this.scene.activeCamera === originalCamera) {
+                this.scene.activeCamera = bulletCam;
+            }
         }, 100);
 
         // Calculate bullet travel distance and time
@@ -469,24 +493,63 @@ export class Player {
 
         // Calculate perpendicular vector for side camera angle
         const right = BABYLON.Vector3.Cross(direction, BABYLON.Vector3.Up()).normalize();
-        const up = BABYLON.Vector3.Cross(right, direction).normalize();
 
         let bulletHit = false;
         let impactTime = 0;
         let distanceTraveled = 0;
-        let piercingPhase = false;
-        let piercingStartTime = 0;
+        let isCleanedUp = false;
+
+        // Cleanup function to safely end bullet cam
+        const cleanupBulletCam = () => {
+            if (isCleanedUp) return;
+            isCleanedUp = true;
+
+            console.log('Cleaning up bullet cam');
+
+            // Unregister update loop
+            this.scene.unregisterAfterRender(bulletUpdate);
+
+            // Restore original camera
+            if (this.scene.activeCamera !== originalCamera) {
+                this.scene.activeCamera = originalCamera;
+            }
+
+            // Dispose bullet cam
+            if (bulletCam) {
+                bulletCam.dispose();
+            }
+
+            // Dispose bullet and tracer
+            if (bullet && !bullet.isDisposed()) {
+                bullet.dispose();
+            }
+            if (tracer && !tracer.isDisposed()) {
+                tracer.dispose();
+            }
+
+            // Reset time scale
+            this.timeScale = 1.0;
+
+            // Mark bullet cam as inactive
+            this.bulletCamActive = false;
+        };
 
         const bulletUpdate = () => {
-            if (distanceTraveled < distance - 0.5 && !piercingPhase) {
+            // Safety check - auto cleanup if too much time has passed
+            const totalElapsed = (performance.now() - startTime) / 1000;
+            if (totalElapsed > 8.0) {
+                console.log('Bullet cam exceeded max time, forcing cleanup');
+                cleanupBulletCam();
+                return;
+            }
+
+            if (distanceTraveled < distance - 0.5 && !bulletHit) {
                 // Bullet is still traveling to target
                 // Update bullet position (affected by timeScale)
                 const scaledDelta = this.scene.getEngine().getDeltaTime() / 1000;
                 const movement = bulletVelocity.scale(scaledDelta * this.timeScale);
                 bullet.position.addInPlace(movement);
                 distanceTraveled += movement.length();
-
-                console.log('Bullet position:', bullet.position, 'Distance traveled:', distanceTraveled);
 
                 // Make bullet visible and always render
                 bullet.isVisible = true;
@@ -542,9 +605,13 @@ export class Player {
                     this.createExplosion(targetPoint);
                 }
 
-                // Clean up bullet
-                bullet.dispose();
-                tracer.dispose();
+                // Clean up bullet meshes
+                if (bullet && !bullet.isDisposed()) {
+                    bullet.dispose();
+                }
+                if (tracer && !tracer.isDisposed()) {
+                    tracer.dispose();
+                }
 
                 // Keep slow motion for entire death animation - 5 seconds total view time
                 setTimeout(() => { this.timeScale = 1.0; }, 5000);
@@ -554,43 +621,16 @@ export class Player {
 
                 if (deathElapsed > 5.0) {
                     // End of death animation viewing
-                    this.scene.unregisterAfterRender(bulletUpdate);
-
-                    // Restore original camera
-                    this.scene.activeCamera = originalCamera;
-                    bulletCam.dispose();
+                    cleanupBulletCam();
                 }
             }
         };
 
         this.scene.registerAfterRender(bulletUpdate);
 
-        // Safety timeout - force end bullet cam after 10 seconds to prevent freezing
+        // Backup safety timeout - force end bullet cam after 10 seconds
         setTimeout(() => {
-            this.scene.unregisterAfterRender(bulletUpdate);
-
-            // Restore original camera if not already restored
-            if (this.scene.activeCamera !== originalCamera) {
-                this.scene.activeCamera = originalCamera;
-            }
-
-            // Clean up bullet cam
-            if (bulletCam) {
-                bulletCam.dispose();
-            }
-
-            // Clean up bullet if still exists
-            if (bullet && !bullet.isDisposed()) {
-                bullet.dispose();
-            }
-            if (tracer && !tracer.isDisposed()) {
-                tracer.dispose();
-            }
-
-            // Reset time scale
-            this.timeScale = 1.0;
-
-            console.log('Bullet cam safety timeout - force ended');
+            cleanupBulletCam();
         }, 10000);
     }
 
@@ -678,6 +718,12 @@ export class Player {
     }
 
     createExplosion(position) {
+        // Play explosion sound
+        if (this.explosionSound) {
+            console.log('Playing explosion sound...');
+            this.explosionSound.play();
+        }
+
         // Create explosion particle system
         const particleSystem = new BABYLON.ParticleSystem("explosion", 100, this.scene);
 
