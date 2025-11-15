@@ -274,6 +274,11 @@ export class Enemy {
     update(deltaTime) {
         if (!this.alive) return;
 
+        // Freeze enemy during bullet cam replay
+        if (this.player.bulletCamActive) {
+            return; // Don't update AI, movement, or shooting during replay
+        }
+
         const distanceToPlayer = BABYLON.Vector3.Distance(
             this.mesh.position,
             this.player.mesh.position
@@ -353,10 +358,11 @@ export class Enemy {
             this.mesh.getWorldMatrix()
         );
 
-        // Direction to player (aim at player center, accounting for crouch)
-        // Get actual player height from camera position
-        const actualPlayerHeight = this.player.camera ? this.player.camera.position.y : 1.0;
-        const playerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, actualPlayerHeight, 0));
+        // Direction to player (aim at player center)
+        // If player is crouching, enemy still aims at standing height (they can't see you're crouching)
+        const isCrouching = this.player.isCrouching || false;
+        const targetHeight = isCrouching ? 1.6 : (this.player.camera ? this.player.camera.position.y : 1.0);
+        const playerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, targetHeight, 0));
         const direction = playerCenter.subtract(weaponWorldPos).normalize();
 
         // First, check if there are any obstacles between enemy and player
@@ -396,18 +402,19 @@ export class Enemy {
         setTimeout(() => rayHelper.hide(), 100);
 
         // No obstacle blocking, now check if ray intersects with player position
-        // Calculate closest point on ray to player
-        const rayToPlayer = playerCenter.subtract(weaponWorldPos);
+        // Calculate closest point on ray to player's ACTUAL position
+        const actualPlayerHeight = this.player.camera ? this.player.camera.position.y : 1.0;
+        const actualPlayerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, actualPlayerHeight, 0));
+        const rayToPlayer = actualPlayerCenter.subtract(weaponWorldPos);
         const rayDot = BABYLON.Vector3.Dot(rayToPlayer, direction);
 
         if (rayDot > 0) { // Player is in front of the enemy
             const closestPoint = weaponWorldPos.add(direction.scale(rayDot));
-            const distanceToRay = BABYLON.Vector3.Distance(closestPoint, playerCenter);
+            const distanceToRay = BABYLON.Vector3.Distance(closestPoint, actualPlayerCenter);
 
             // Check if ray passes close enough to player (within player radius)
-            // Smaller radius when crouching to make it harder to hit
-            const isCrouching = this.player.isCrouching || false;
-            const playerRadius = isCrouching ? 0.35 : 0.5; // Smaller hitbox when crouching
+            // Much smaller hitbox when crouching - bullets should miss completely
+            const playerRadius = isCrouching ? 0.15 : 0.5; // Tiny hitbox when crouching
 
             if (distanceToRay < playerRadius && rayDot < 100) { // Within 100 units
                 console.log('Enemy hit player for', this.damage, 'damage! Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching);
@@ -416,7 +423,7 @@ export class Enemy {
                 // Create bullet impact on player
                 this.createBulletImpact(closestPoint);
             } else {
-                console.log('Enemy shot missed player. Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching);
+                console.log('Enemy shot missed player. Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching, 'Actual height:', actualPlayerHeight.toFixed(2));
             }
         } else {
             console.log('Enemy shot wrong direction');
