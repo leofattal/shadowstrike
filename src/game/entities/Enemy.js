@@ -353,8 +353,10 @@ export class Enemy {
             this.mesh.getWorldMatrix()
         );
 
-        // Direction to player (aim at player center)
-        const playerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, 1.0, 0));
+        // Direction to player (aim at player center, accounting for crouch)
+        // Get actual player height from camera position
+        const actualPlayerHeight = this.player.camera ? this.player.camera.position.y : 1.0;
+        const playerCenter = this.player.mesh.position.add(new BABYLON.Vector3(0, actualPlayerHeight, 0));
         const direction = playerCenter.subtract(weaponWorldPos).normalize();
 
         // First, check if there are any obstacles between enemy and player
@@ -403,15 +405,18 @@ export class Enemy {
             const distanceToRay = BABYLON.Vector3.Distance(closestPoint, playerCenter);
 
             // Check if ray passes close enough to player (within player radius)
-            const playerRadius = 0.5; // Slightly larger than actual for easier hits
+            // Smaller radius when crouching to make it harder to hit
+            const isCrouching = this.player.isCrouching || false;
+            const playerRadius = isCrouching ? 0.35 : 0.5; // Smaller hitbox when crouching
+
             if (distanceToRay < playerRadius && rayDot < 100) { // Within 100 units
-                console.log('Enemy hit player for', this.damage, 'damage! Distance to ray:', distanceToRay.toFixed(2));
+                console.log('Enemy hit player for', this.damage, 'damage! Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching);
                 this.player.takeDamage(this.damage);
 
                 // Create bullet impact on player
                 this.createBulletImpact(closestPoint);
             } else {
-                console.log('Enemy shot missed player. Distance to ray:', distanceToRay.toFixed(2));
+                console.log('Enemy shot missed player. Distance to ray:', distanceToRay.toFixed(2), 'Crouching:', isCrouching);
             }
         } else {
             console.log('Enemy shot wrong direction');
