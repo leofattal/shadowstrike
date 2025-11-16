@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+    <meta name="screen-orientation" content="landscape">
     <title>Sniper Strike: Shadow Mission</title>
     <style>
         * {
@@ -471,6 +475,144 @@
             pointer-events: auto;
             touch-action: none;
         }
+
+        /* Jump button */
+        .jump-button {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, rgba(0, 255, 100, 0.7), rgba(0, 200, 50, 0.5));
+            border: 3px solid rgba(0, 255, 100, 0.9);
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(0, 255, 100, 0.5);
+            position: absolute;
+            bottom: 90px;
+            right: 170px;
+            user-select: none;
+        }
+
+        .jump-button:active {
+            background: radial-gradient(circle, rgba(100, 255, 150, 0.9), rgba(0, 255, 100, 0.7));
+            transform: scale(0.95);
+        }
+
+        /* Landscape orientation message */
+        .orientation-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .rotate-icon {
+            font-size: 80px;
+            margin: 20px 0;
+            animation: rotate-hint 2s ease-in-out infinite;
+        }
+
+        @keyframes rotate-hint {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        @media (max-width: 768px) and (orientation: portrait) {
+            .orientation-message {
+                display: flex;
+            }
+        }
+
+        /* Scope button indicator */
+        .shoot-button.scoping {
+            background: radial-gradient(circle, rgba(255, 200, 0, 0.9), rgba(255, 150, 0, 0.7));
+            border-color: rgba(255, 200, 0, 0.9);
+            box-shadow: 0 0 30px rgba(255, 200, 0, 0.8);
+        }
+
+        /* Mobile landscape optimizations */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .hud-top-left {
+                top: 10px;
+                left: 10px;
+            }
+
+            .hud-top-right {
+                top: 10px;
+                right: 10px;
+            }
+
+            .health-bar {
+                width: 150px;
+                height: 15px;
+            }
+
+            .ammo-display {
+                font-size: 18px;
+            }
+
+            #objectiveText {
+                font-size: 12px;
+            }
+
+            .joystick-zone {
+                width: 120px;
+                height: 120px;
+                bottom: 10px;
+                left: 10px;
+            }
+
+            .joystick-stick {
+                width: 50px;
+                height: 50px;
+            }
+
+            .action-buttons {
+                bottom: 10px;
+                right: 10px;
+            }
+
+            .shoot-button {
+                width: 70px;
+                height: 70px;
+                font-size: 28px;
+            }
+
+            .crouch-button,
+            .jump-button,
+            .reload-button {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+
+            .crouch-button {
+                bottom: 75px;
+                right: 0;
+            }
+
+            .jump-button {
+                bottom: 75px;
+                right: 140px;
+            }
+
+            .reload-button {
+                bottom: 0;
+                right: 75px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -616,6 +758,12 @@
         <div>Loading Sniper Strike...</div>
     </div>
 
+    <!-- Landscape Orientation Message -->
+    <div class="orientation-message">
+        <div class="rotate-icon">📱</div>
+        <div>Please rotate your device to landscape mode</div>
+    </div>
+
     <!-- Mobile Touch Controls -->
     <div class="mobile-controls" id="mobileControls">
         <!-- Virtual Joystick -->
@@ -631,6 +779,7 @@
         <div class="action-buttons">
             <div class="shoot-button" id="shootButton">🎯</div>
             <div class="crouch-button" id="crouchButton">⬇️</div>
+            <div class="jump-button" id="jumpButton">⬆️</div>
             <div class="reload-button" id="reloadButton">🔄</div>
         </div>
     </div>

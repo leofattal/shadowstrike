@@ -233,17 +233,58 @@ export class InputManager {
         lookZone.addEventListener('touchend', endLook);
         lookZone.addEventListener('touchcancel', endLook);
 
-        // Shoot Button
+        // Shoot Button with Long-Press to Scope
         const shootButton = document.getElementById('shootButton');
+        let longPressTimer = null;
+        let isScoping = false;
+
         shootButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            this.touchShoot = true;
-            this.mouseButtons[0] = true; // Simulate left click
+
+            // Start long-press timer for scoping (500ms)
+            longPressTimer = setTimeout(() => {
+                isScoping = true;
+                this.mouseButtons[2] = true; // Simulate right click for scope
+                shootButton.classList.add('scoping');
+                console.log('Long press - entering scope mode');
+            }, 500);
         });
+
         shootButton.addEventListener('touchend', (e) => {
             e.preventDefault();
-            this.touchShoot = false;
-            this.mouseButtons[0] = false;
+
+            // Clear long-press timer
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+
+            // If we were scoping, exit scope
+            if (isScoping) {
+                this.mouseButtons[2] = false; // Release right click
+                shootButton.classList.remove('scoping');
+                console.log('Released - exiting scope mode');
+                isScoping = false;
+            } else {
+                // Quick tap - fire shot
+                this.mouseButtons[0] = true; // Left click
+                console.log('Quick tap - firing shot');
+                setTimeout(() => {
+                    this.mouseButtons[0] = false;
+                }, 50);
+            }
+        });
+
+        shootButton.addEventListener('touchcancel', (e) => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            if (isScoping) {
+                this.mouseButtons[2] = false;
+                shootButton.classList.remove('scoping');
+                isScoping = false;
+            }
         });
 
         // Crouch Button
@@ -253,6 +294,17 @@ export class InputManager {
             this.touchCrouch = !this.touchCrouch;
             this.keys['KeyC'] = this.touchCrouch; // Simulate C key
             crouchButton.classList.toggle('active', this.touchCrouch);
+        });
+
+        // Jump Button
+        const jumpButton = document.getElementById('jumpButton');
+        jumpButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.keys['Space'] = true; // Simulate Space key
+        });
+        jumpButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.keys['Space'] = false;
         });
 
         // Reload Button
