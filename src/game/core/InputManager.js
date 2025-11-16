@@ -156,6 +156,9 @@ export class InputManager {
     setupMobileControls() {
         console.log('Setting up mobile controls');
 
+        // Setup orientation detection
+        this.setupOrientationDetection();
+
         // Virtual Joystick
         const joystickZone = document.getElementById('joystickZone');
         const joystickStick = document.getElementById('joystickStick');
@@ -316,5 +319,55 @@ export class InputManager {
                 this.keys['KeyR'] = false;
             }, 100);
         });
+    }
+
+    setupOrientationDetection() {
+        const orientationMessage = document.querySelector('.orientation-message');
+        const mobileControls = document.getElementById('mobileControls');
+
+        const checkOrientation = () => {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            console.log('Orientation check:', {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                isLandscape: isLandscape,
+                orientation: screen.orientation ? screen.orientation.type : 'unknown'
+            });
+
+            if (orientationMessage) {
+                if (isLandscape) {
+                    orientationMessage.style.display = 'none';
+                    if (mobileControls) {
+                        mobileControls.style.display = 'block';
+                    }
+                } else {
+                    orientationMessage.style.display = 'flex';
+                    if (mobileControls) {
+                        mobileControls.style.display = 'none';
+                    }
+                }
+            }
+        };
+
+        // Check on load
+        checkOrientation();
+
+        // Listen for orientation changes
+        window.addEventListener('orientationchange', () => {
+            console.log('Orientation changed event fired');
+            setTimeout(checkOrientation, 100); // Small delay to ensure dimensions are updated
+        });
+
+        // Also listen to resize (more reliable on some devices)
+        window.addEventListener('resize', checkOrientation);
+
+        // Try to lock orientation to landscape (may not work on all browsers)
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').then(() => {
+                console.log('Screen orientation locked to landscape');
+            }).catch((error) => {
+                console.log('Could not lock screen orientation:', error);
+            });
+        }
     }
 }

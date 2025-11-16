@@ -501,7 +501,7 @@
 
         /* Landscape orientation message */
         .orientation-message {
-            display: none;
+            display: none; /* Controlled by JavaScript */
             position: fixed;
             top: 0;
             left: 0;
@@ -527,12 +527,6 @@
         @keyframes rotate-hint {
             0%, 100% { transform: rotate(0deg); }
             50% { transform: rotate(90deg); }
-        }
-
-        @media (max-width: 768px) and (orientation: portrait) {
-            .orientation-message {
-                display: flex;
-            }
         }
 
         /* Scope button indicator */
