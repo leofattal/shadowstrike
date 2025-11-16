@@ -340,12 +340,15 @@ export class Player {
         this.lastShotTime = now;
         this.currentAmmo--;
 
-        // Play shooting sound
-        if (this.shootSound) {
-            console.log('Playing shoot sound...');
-            this.shootSound.play();
-        } else {
-            console.log('Shoot sound not loaded!');
+        // Play shooting sound (only for non-explosive weapons)
+        // Explosive weapons play explosion sound instead
+        if (!this.weaponStats.hasExplosiveAmmo) {
+            if (this.shootSound) {
+                console.log('Playing shoot sound...');
+                this.shootSound.play();
+            } else {
+                console.log('Shoot sound not loaded!');
+            }
         }
 
         // Create muzzle flash particle effect

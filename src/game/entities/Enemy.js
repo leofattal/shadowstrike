@@ -273,10 +273,10 @@ export class Enemy {
     }
 
     update(deltaTime) {
-        if (!this.alive) return;
-
-        // Always update bullets (they still fly during bullet cam, but in slow motion)
+        // Always update bullets even if enemy is dead (bullets keep flying)
         this.updateBullets(deltaTime);
+
+        if (!this.alive) return;
 
         // Freeze enemy AI during bullet cam replay
         if (this.player.bulletCamActive) {
