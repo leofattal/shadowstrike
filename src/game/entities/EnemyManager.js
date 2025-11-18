@@ -61,15 +61,36 @@ export class EnemyManager {
     }
 
     update(deltaTime) {
-        // Update all enemies
+        // Update all enemies (including dead ones for bullet updates)
         this.enemies.forEach(enemy => {
-            if (enemy.alive) {
-                enemy.update(deltaTime);
-            }
+            enemy.update(deltaTime);
         });
 
-        // Remove dead enemies
-        this.enemies = this.enemies.filter(enemy => enemy.alive);
+        // Clean up and remove dead enemies after their bullets are gone
+        this.enemies = this.enemies.filter(enemy => {
+            if (!enemy.alive) {
+                // If enemy is dead and has no active bullets, dispose it
+                if (enemy.activeBullets && enemy.activeBullets.length === 0) {
+                    console.log('Removing dead enemy with no bullets');
+                    // Dispose enemy resources
+                    if (enemy.bodyParts) {
+                        enemy.bodyParts.forEach(part => {
+                            if (part && !part.isDisposed()) part.dispose();
+                        });
+                    }
+                    if (enemy.healthBar && !enemy.healthBar.isDisposed()) {
+                        enemy.healthBar.dispose();
+                    }
+                    if (enemy.mesh && !enemy.mesh.isDisposed()) {
+                        enemy.mesh.dispose();
+                    }
+                    return false; // Remove from array
+                }
+                // Keep dead enemy until bullets are gone
+                return true;
+            }
+            return true; // Keep alive enemies
+        });
     }
 
     getAliveCount() {
