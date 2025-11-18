@@ -14,20 +14,38 @@ export class EnemyManager {
     }
 
     spawnTestEnemies() {
-        // Spawn enemies at various distances for sniper gameplay
-        const spawnPositions = [
-            new BABYLON.Vector3(25, 1, 15),   // Far right
-            new BABYLON.Vector3(-25, 1, 20),  // Far left
-            new BABYLON.Vector3(15, 1, 30),   // Far front-right
-            new BABYLON.Vector3(-15, 1, 35),  // Far front-left
-            new BABYLON.Vector3(30, 1, 25),   // Very far right
-            new BABYLON.Vector3(-30, 1, 30),  // Very far left
-            new BABYLON.Vector3(0, 1, 40),    // Straight ahead far
-            new BABYLON.Vector3(20, 1, 40)    // Diagonal far
+        // Get player position and forward direction
+        const playerPos = this.player.mesh.position;
+        const playerForward = this.player.camera.getDirection(BABYLON.Vector3.Forward());
+
+        // Spawn enemies in front of the player at various distances and angles
+        const spawnConfigs = [
+            { distance: 20, angleOffset: 0 },      // Straight ahead
+            { distance: 25, angleOffset: 15 },     // Slight right
+            { distance: 25, angleOffset: -15 },    // Slight left
+            { distance: 30, angleOffset: 20 },     // Far right
+            { distance: 30, angleOffset: -20 },    // Far left
+            { distance: 35, angleOffset: 0 },      // Very far straight
+            { distance: 40, angleOffset: 10 },     // Very far slight right
+            { distance: 40, angleOffset: -10 }     // Very far slight left
         ];
 
-        spawnPositions.forEach(pos => {
-            const enemy = new Enemy(this.scene, pos, this.player);
+        spawnConfigs.forEach(config => {
+            // Calculate spawn position relative to player's forward direction
+            const angle = (config.angleOffset * Math.PI) / 180; // Convert to radians
+
+            // Rotate forward direction by angle
+            const rotatedForward = new BABYLON.Vector3(
+                playerForward.x * Math.cos(angle) - playerForward.z * Math.sin(angle),
+                0, // Keep at ground level
+                playerForward.x * Math.sin(angle) + playerForward.z * Math.cos(angle)
+            ).normalize();
+
+            // Calculate spawn position
+            const spawnPos = playerPos.add(rotatedForward.scale(config.distance));
+            spawnPos.y = 0; // Ensure on ground level
+
+            const enemy = new Enemy(this.scene, spawnPos, this.player);
             this.enemies.push(enemy);
 
             // Add enemy body parts to shadow generator
@@ -39,7 +57,7 @@ export class EnemyManager {
             }
         });
 
-        console.log(`Spawned ${this.enemies.length} enemies`);
+        console.log(`Spawned ${this.enemies.length} enemies in front of player`);
     }
 
     update(deltaTime) {
