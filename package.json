@@ -2,7 +2,7 @@
   "name": "sniper-strike-shadow-mission",
   "version": "0.1.0",
   "description": "3D tactical shooter game built with Babylon.js",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
