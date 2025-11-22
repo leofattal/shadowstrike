@@ -18,6 +18,8 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // Game state
 const players = new Map();
 const bullets = [];
+const lootDrops = new Map();
+let lootIdCounter = 0;
 
 // Player colors for different players
 const playerColors = [
@@ -46,7 +48,10 @@ io.on('connection', (socket) => {
         username: `Player${players.size + 1}`,
         kills: 0,
         deaths: 0,
-        isCrouching: false
+        isCrouching: false,
+        weapons: ['PISTOL', 'KNIFE', 'SNIPER_RIFLE'],
+        currentWeapon: 'PISTOL',
+        coins: 0
     };
     colorIndex++;
 
@@ -56,7 +61,8 @@ io.on('connection', (socket) => {
     socket.emit('playerInit', {
         id: socket.id,
         ...playerData,
-        players: Array.from(players.values())
+        players: Array.from(players.values()),
+        lootDrops: Array.from(lootDrops.values())
     });
 
     // Notify other players of new player
@@ -114,6 +120,31 @@ io.on('connection', (socket) => {
                 shooter.kills++;
                 target.deaths++;
 
+                // Create loot drop at victim's position
+                const droppedWeapons = target.weapons.filter(w => w !== 'PISTOL' && w !== 'KNIFE');
+                if (droppedWeapons.length > 0 || target.coins > 0) {
+                    const lootId = 'loot_' + (lootIdCounter++);
+                    const loot = {
+                        id: lootId,
+                        position: { ...target.position },
+                        weapons: droppedWeapons,
+                        coins: Math.floor(target.coins / 2), // Drop half their coins
+                        droppedBy: target.username
+                    };
+                    lootDrops.set(lootId, loot);
+
+                    // Notify all players of loot drop
+                    io.emit('lootDropped', loot);
+
+                    // Remove loot after 60 seconds
+                    setTimeout(() => {
+                        if (lootDrops.has(lootId)) {
+                            lootDrops.delete(lootId);
+                            io.emit('lootExpired', lootId);
+                        }
+                    }, 60000);
+                }
+
                 // Notify all players of the kill
                 io.emit('playerKilled', {
                     killerId: socket.id,
@@ -131,10 +162,16 @@ io.on('connection', (socket) => {
                         y: 0,
                         z: Math.random() * 400 - 200
                     };
+                    // Reset to starting weapons
+                    target.weapons = ['PISTOL', 'KNIFE', 'SNIPER_RIFLE'];
+                    target.currentWeapon = 'PISTOL';
+                    target.coins = 0;
 
                     io.to(data.targetId).emit('respawn', {
                         position: target.position,
-                        health: target.health
+                        health: target.health,
+                        weapons: target.weapons,
+                        coins: target.coins
                     });
 
                     io.emit('playerRespawned', {
@@ -155,6 +192,55 @@ io.on('connection', (socket) => {
                 username: player.username,
                 message: message
             });
+        }
+    });
+
+    // Handle loot pickup
+    socket.on('pickupLoot', (lootId) => {
+        const player = players.get(socket.id);
+        const loot = lootDrops.get(lootId);
+
+        if (player && loot) {
+            // Add weapons to player's inventory
+            loot.weapons.forEach(weapon => {
+                if (!player.weapons.includes(weapon)) {
+                    player.weapons.push(weapon);
+                }
+            });
+
+            // Add coins
+            player.coins += loot.coins;
+
+            // Remove loot from map
+            lootDrops.delete(lootId);
+
+            // Notify player of pickup
+            socket.emit('lootPickedUp', {
+                lootId: lootId,
+                weapons: loot.weapons,
+                coins: loot.coins,
+                newInventory: player.weapons,
+                totalCoins: player.coins
+            });
+
+            // Notify all players that loot was picked up
+            io.emit('lootRemoved', lootId);
+        }
+    });
+
+    // Handle weapon purchase/acquisition
+    socket.on('weaponAcquired', (weaponKey) => {
+        const player = players.get(socket.id);
+        if (player && !player.weapons.includes(weaponKey)) {
+            player.weapons.push(weaponKey);
+        }
+    });
+
+    // Handle coin update
+    socket.on('coinsUpdate', (coins) => {
+        const player = players.get(socket.id);
+        if (player) {
+            player.coins = coins;
         }
     });
 

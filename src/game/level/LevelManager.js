@@ -346,10 +346,13 @@ export class LevelManager {
     }
 
     createHouse(position, index) {
-        // Two-story house with windows
+        // Two-story house with enterable interior
         const houseWidth = 12;
         const houseDepth = 10;
         const floorHeight = 4;
+        const wallThickness = 0.3;
+        const doorWidth = 2.5;
+        const doorHeight = 3;
 
         // Materials
         const wallMat = new BABYLON.StandardMaterial('houseMat' + index, this.scene);
@@ -360,100 +363,199 @@ export class LevelManager {
         roofMat.diffuseColor = new BABYLON.Color3(0.4, 0.25, 0.2);
         roofMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
-        // First floor walls
-        const firstFloor = BABYLON.MeshBuilder.CreateBox('house1_' + index, {
-            width: houseWidth,
-            height: floorHeight,
-            depth: houseDepth
-        }, this.scene);
-        firstFloor.position = new BABYLON.Vector3(position.x, floorHeight / 2, position.z);
-        firstFloor.material = wallMat;
-        firstFloor.checkCollisions = true;
-        this.shadowGenerator.addShadowCaster(firstFloor);
-        firstFloor.receiveShadows = true;
+        const floorMat = new BABYLON.StandardMaterial('floorMat' + index, this.scene);
+        floorMat.diffuseColor = new BABYLON.Color3(0.5, 0.4, 0.3);
 
-        // Second floor
-        const secondFloor = BABYLON.MeshBuilder.CreateBox('house2_' + index, {
+        // Helper function to create wall with collision
+        const createWall = (name, width, height, depth, pos) => {
+            const wall = BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, this.scene);
+            wall.position = pos;
+            wall.material = wallMat;
+            wall.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(wall);
+            wall.receiveShadows = true;
+            return wall;
+        };
+
+        // First floor walls with door opening on front (positive Z)
+        // Back wall (full)
+        createWall('houseBack_' + index, houseWidth, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x, floorHeight / 2, position.z - houseDepth / 2));
+
+        // Front wall - left section
+        createWall('houseFrontL_' + index, (houseWidth - doorWidth) / 2, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x - (houseWidth + doorWidth) / 4, floorHeight / 2, position.z + houseDepth / 2));
+
+        // Front wall - right section
+        createWall('houseFrontR_' + index, (houseWidth - doorWidth) / 2, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x + (houseWidth + doorWidth) / 4, floorHeight / 2, position.z + houseDepth / 2));
+
+        // Front wall - above door
+        createWall('houseFrontTop_' + index, doorWidth, floorHeight - doorHeight, wallThickness,
+            new BABYLON.Vector3(position.x, floorHeight - (floorHeight - doorHeight) / 2, position.z + houseDepth / 2));
+
+        // Left wall (full)
+        createWall('houseLeft_' + index, wallThickness, floorHeight, houseDepth,
+            new BABYLON.Vector3(position.x - houseWidth / 2, floorHeight / 2, position.z));
+
+        // Right wall (full)
+        createWall('houseRight_' + index, wallThickness, floorHeight, houseDepth,
+            new BABYLON.Vector3(position.x + houseWidth / 2, floorHeight / 2, position.z));
+
+        // Second floor platform
+        const floor2 = BABYLON.MeshBuilder.CreateBox('houseFloor2_' + index, {
             width: houseWidth,
-            height: floorHeight,
+            height: 0.3,
             depth: houseDepth
         }, this.scene);
-        secondFloor.position = new BABYLON.Vector3(position.x, floorHeight * 1.5, position.z);
-        secondFloor.material = wallMat;
-        secondFloor.checkCollisions = true;
-        this.shadowGenerator.addShadowCaster(secondFloor);
-        secondFloor.receiveShadows = true;
+        floor2.position = new BABYLON.Vector3(position.x, floorHeight, position.z);
+        floor2.material = floorMat;
+        floor2.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(floor2);
+
+        // Second floor walls (with window openings)
+        // Back wall
+        createWall('house2Back_' + index, houseWidth, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x, floorHeight + floorHeight / 2, position.z - houseDepth / 2));
+
+        // Front wall with window opening
+        createWall('house2FrontL_' + index, houseWidth / 3, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x - houseWidth / 3, floorHeight + floorHeight / 2, position.z + houseDepth / 2));
+        createWall('house2FrontR_' + index, houseWidth / 3, floorHeight, wallThickness,
+            new BABYLON.Vector3(position.x + houseWidth / 3, floorHeight + floorHeight / 2, position.z + houseDepth / 2));
+        createWall('house2FrontTop_' + index, houseWidth / 3, floorHeight / 2, wallThickness,
+            new BABYLON.Vector3(position.x, floorHeight + floorHeight * 0.75, position.z + houseDepth / 2));
+
+        // Left wall
+        createWall('house2Left_' + index, wallThickness, floorHeight, houseDepth,
+            new BABYLON.Vector3(position.x - houseWidth / 2, floorHeight + floorHeight / 2, position.z));
+
+        // Right wall
+        createWall('house2Right_' + index, wallThickness, floorHeight, houseDepth,
+            new BABYLON.Vector3(position.x + houseWidth / 2, floorHeight + floorHeight / 2, position.z));
 
         // Roof
         const roof = BABYLON.MeshBuilder.CreateBox('roof_' + index, {
             width: houseWidth + 1,
-            height: 3,
+            height: 0.5,
             depth: houseDepth + 1
         }, this.scene);
-        roof.position = new BABYLON.Vector3(position.x, floorHeight * 2 + 1.5, position.z);
+        roof.position = new BABYLON.Vector3(position.x, floorHeight * 2 + 0.25, position.z);
         roof.material = roofMat;
         roof.checkCollisions = true;
         this.shadowGenerator.addShadowCaster(roof);
         roof.receiveShadows = true;
 
-        // Doorway (front)
-        const doorway = BABYLON.MeshBuilder.CreateBox('doorway_' + index, {
+        // Stairs inside (simple ramp)
+        const stairs = BABYLON.MeshBuilder.CreateBox('stairs_' + index, {
             width: 2,
-            height: 3,
-            depth: 1
+            height: 0.3,
+            depth: 4
         }, this.scene);
-        doorway.position = new BABYLON.Vector3(position.x, 1.5, position.z + houseDepth / 2);
-        const doorMat = new BABYLON.StandardMaterial('doorMat' + index, this.scene);
-        doorMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.15);
-        doorway.material = doorMat;
+        stairs.position = new BABYLON.Vector3(position.x + 3, floorHeight / 2, position.z - 2);
+        stairs.rotation.x = -Math.PI / 6; // Ramp angle
+        stairs.material = floorMat;
+        stairs.checkCollisions = true;
     }
 
     createWarehouse(position, index) {
-        // Large industrial warehouse
+        // Large industrial warehouse with enterable interior
         const warehouseWidth = 20;
         const warehouseDepth = 15;
         const warehouseHeight = 8;
+        const wallThickness = 0.4;
+        const doorWidth = 6; // Large garage door
+        const doorHeight = 5;
 
         const metalMat = new BABYLON.StandardMaterial('warehouseMat' + index, this.scene);
         metalMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.55);
         metalMat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
         metalMat.specularPower = 32;
 
-        // Main structure
-        const main = BABYLON.MeshBuilder.CreateBox('warehouse_' + index, {
-            width: warehouseWidth,
-            height: warehouseHeight,
-            depth: warehouseDepth
-        }, this.scene);
-        main.position = new BABYLON.Vector3(position.x, warehouseHeight / 2, position.z);
-        main.material = metalMat;
-        main.checkCollisions = true;
-        this.shadowGenerator.addShadowCaster(main);
-        main.receiveShadows = true;
+        const floorMat = new BABYLON.StandardMaterial('warehouseFloor' + index, this.scene);
+        floorMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
 
-        // Roof overhang
-        const overhang = BABYLON.MeshBuilder.CreateBox('overhang_' + index, {
+        // Helper function to create wall with collision
+        const createWall = (name, width, height, depth, pos) => {
+            const wall = BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, this.scene);
+            wall.position = pos;
+            wall.material = metalMat;
+            wall.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(wall);
+            wall.receiveShadows = true;
+            return wall;
+        };
+
+        // Back wall (full)
+        createWall('warehouseBack_' + index, warehouseWidth, warehouseHeight, wallThickness,
+            new BABYLON.Vector3(position.x, warehouseHeight / 2, position.z - warehouseDepth / 2));
+
+        // Front wall with large garage door opening
+        createWall('warehouseFrontL_' + index, (warehouseWidth - doorWidth) / 2, warehouseHeight, wallThickness,
+            new BABYLON.Vector3(position.x - (warehouseWidth + doorWidth) / 4, warehouseHeight / 2, position.z + warehouseDepth / 2));
+        createWall('warehouseFrontR_' + index, (warehouseWidth - doorWidth) / 2, warehouseHeight, wallThickness,
+            new BABYLON.Vector3(position.x + (warehouseWidth + doorWidth) / 4, warehouseHeight / 2, position.z + warehouseDepth / 2));
+        createWall('warehouseFrontTop_' + index, doorWidth, warehouseHeight - doorHeight, wallThickness,
+            new BABYLON.Vector3(position.x, warehouseHeight - (warehouseHeight - doorHeight) / 2, position.z + warehouseDepth / 2));
+
+        // Left wall with side door
+        const sideDoorWidth = 2;
+        const sideDoorHeight = 3;
+        createWall('warehouseLeftFront_' + index, wallThickness, warehouseHeight, (warehouseDepth - sideDoorWidth) / 2,
+            new BABYLON.Vector3(position.x - warehouseWidth / 2, warehouseHeight / 2, position.z + (warehouseDepth + sideDoorWidth) / 4));
+        createWall('warehouseLeftBack_' + index, wallThickness, warehouseHeight, (warehouseDepth - sideDoorWidth) / 2,
+            new BABYLON.Vector3(position.x - warehouseWidth / 2, warehouseHeight / 2, position.z - (warehouseDepth + sideDoorWidth) / 4));
+        createWall('warehouseLeftTop_' + index, wallThickness, warehouseHeight - sideDoorHeight, sideDoorWidth,
+            new BABYLON.Vector3(position.x - warehouseWidth / 2, warehouseHeight - (warehouseHeight - sideDoorHeight) / 2, position.z));
+
+        // Right wall (full)
+        createWall('warehouseRight_' + index, wallThickness, warehouseHeight, warehouseDepth,
+            new BABYLON.Vector3(position.x + warehouseWidth / 2, warehouseHeight / 2, position.z));
+
+        // Roof
+        const roof = BABYLON.MeshBuilder.CreateBox('warehouseRoof_' + index, {
             width: warehouseWidth + 2,
             height: 0.5,
             depth: warehouseDepth + 2
         }, this.scene);
-        overhang.position = new BABYLON.Vector3(position.x, warehouseHeight + 0.25, position.z);
-        overhang.material = metalMat;
-        overhang.checkCollisions = true;
-        this.shadowGenerator.addShadowCaster(overhang);
+        roof.position = new BABYLON.Vector3(position.x, warehouseHeight + 0.25, position.z);
+        roof.material = metalMat;
+        roof.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(roof);
 
-        // Loading dock
+        // Loading dock / ramp at front entrance
         const dock = BABYLON.MeshBuilder.CreateBox('dock_' + index, {
-            width: 8,
-            height: 1,
+            width: doorWidth + 2,
+            height: 0.5,
             depth: 3
         }, this.scene);
-        dock.position = new BABYLON.Vector3(position.x, 0.5, position.z + warehouseDepth / 2 + 1.5);
-        const dockMat = new BABYLON.StandardMaterial('dockMat' + index, this.scene);
-        dockMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-        dock.material = dockMat;
+        dock.position = new BABYLON.Vector3(position.x, 0.25, position.z + warehouseDepth / 2 + 1.5);
+        dock.material = floorMat;
         dock.checkCollisions = true;
         this.shadowGenerator.addShadowCaster(dock);
+
+        // Interior crates for cover
+        const crateMat = new BABYLON.StandardMaterial('crateMat' + index, this.scene);
+        crateMat.diffuseColor = new BABYLON.Color3(0.45, 0.35, 0.25);
+
+        // Stack of crates inside
+        const cratePositions = [
+            { x: -5, z: -3 },
+            { x: 5, z: -3 },
+            { x: 0, z: 0 }
+        ];
+
+        cratePositions.forEach((cp, i) => {
+            const crate = BABYLON.MeshBuilder.CreateBox('warehouseCrate_' + index + '_' + i, {
+                width: 2,
+                height: 2,
+                depth: 2
+            }, this.scene);
+            crate.position = new BABYLON.Vector3(position.x + cp.x, 1, position.z + cp.z);
+            crate.material = crateMat;
+            crate.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(crate);
+        });
     }
 
     createWatchTower(position, index) {

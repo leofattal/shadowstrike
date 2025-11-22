@@ -12,8 +12,8 @@ export class Player {
         this.coins = 0;
 
         // Weapon system
-        this.currentWeapon = 'SNIPER_RIFLE';
-        this.ownedWeapons = ['SNIPER_RIFLE'];
+        this.currentWeapon = 'PISTOL';
+        this.ownedWeapons = ['PISTOL', 'KNIFE', 'SNIPER_RIFLE'];
         this.weaponUpgrades = {};
         this.weaponStats = null;
 
@@ -329,7 +329,9 @@ export class Player {
 
     shoot() {
         if (this.isReloading) return;
-        if (this.currentAmmo <= 0) {
+
+        // Knife doesn't use ammo
+        if (!this.weaponStats.isMelee && this.currentAmmo <= 0) {
             this.reload();
             return;
         }
@@ -338,11 +340,14 @@ export class Player {
         if (now - this.lastShotTime < this.fireRate) return;
 
         this.lastShotTime = now;
-        this.currentAmmo--;
 
-        // Play shooting sound (only for non-explosive weapons)
-        // Explosive weapons play explosion sound instead
-        if (!this.weaponStats.hasExplosiveAmmo) {
+        // Only decrement ammo for non-melee weapons
+        if (!this.weaponStats.isMelee) {
+            this.currentAmmo--;
+        }
+
+        // Play shooting sound (only for non-explosive and non-melee weapons)
+        if (!this.weaponStats.hasExplosiveAmmo && !this.weaponStats.isMelee) {
             if (this.shootSound) {
                 console.log('Playing shoot sound...');
                 this.shootSound.play();
@@ -351,14 +356,18 @@ export class Player {
             }
         }
 
-        // Create muzzle flash particle effect
-        this.createMuzzleFlash();
+        // Create muzzle flash particle effect (not for melee)
+        if (!this.weaponStats.isMelee) {
+            this.createMuzzleFlash();
+        }
 
         // Create ray from camera center - use getDirection for accurate aiming
         const origin = this.camera.globalPosition;
         const forward = this.camera.getDirection(BABYLON.Vector3.Forward());
 
-        const ray = new BABYLON.Ray(origin, forward, 1000);
+        // Use melee range for knife, otherwise normal range
+        const range = this.weaponStats.isMelee ? (this.weaponStats.meleeRange || 3) : 1000;
+        const ray = new BABYLON.Ray(origin, forward, range);
 
         // Send bullet to network if in PvP mode
         if (this.networkManager && this.networkManager.isConnected) {

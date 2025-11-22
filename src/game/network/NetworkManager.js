@@ -12,6 +12,8 @@ export class NetworkManager {
         this.updateInterval = null;
         this.onKillCallback = null;
         this.onDeathCallback = null;
+        this.lootDrops = new Map();
+        this.onLootPickupCallback = null;
     }
 
     connect(serverUrl = window.location.origin) {
@@ -45,6 +47,13 @@ export class NetworkManager {
                         this.spawnRemotePlayer(playerData);
                     }
                 });
+
+                // Spawn existing loot drops
+                if (data.lootDrops) {
+                    data.lootDrops.forEach(loot => {
+                        this.spawnLootDrop(loot);
+                    });
+                }
 
                 // Start sending position updates
                 this.startPositionUpdates();
@@ -118,6 +127,43 @@ export class NetworkManager {
                         data.position.z
                     );
                     remotePlayer.mesh.setEnabled(true);
+                }
+            });
+
+            // Loot drop events
+            this.socket.on('lootDropped', (loot) => {
+                console.log('Loot dropped:', loot);
+                this.spawnLootDrop(loot);
+            });
+
+            this.socket.on('lootRemoved', (lootId) => {
+                this.removeLootDrop(lootId);
+            });
+
+            this.socket.on('lootExpired', (lootId) => {
+                this.removeLootDrop(lootId);
+            });
+
+            this.socket.on('lootPickedUp', (data) => {
+                console.log('Picked up loot:', data);
+                // Update player inventory
+                this.player.ownedWeapons = data.newInventory;
+                this.player.coins = data.totalCoins;
+
+                // Show notification
+                let message = '';
+                if (data.weapons.length > 0) {
+                    message += `+${data.weapons.join(', ')}`;
+                }
+                if (data.coins > 0) {
+                    message += (message ? ' & ' : '') + `+${data.coins} coins`;
+                }
+                if (message) {
+                    this.showNotification(`Picked up: ${message}`);
+                }
+
+                if (this.onLootPickupCallback) {
+                    this.onLootPickupCallback(data);
                 }
             });
 
@@ -466,5 +512,105 @@ export class NetworkManager {
 
     getRemotePlayerId(mesh) {
         return mesh.remotePlayerId;
+    }
+
+    // Loot drop methods
+    spawnLootDrop(loot) {
+        // Create loot crate mesh
+        const lootMesh = BABYLON.MeshBuilder.CreateBox('loot_' + loot.id, {
+            width: 1,
+            height: 0.6,
+            depth: 0.8
+        }, this.scene);
+
+        lootMesh.position = new BABYLON.Vector3(
+            loot.position.x,
+            0.3, // Slightly above ground
+            loot.position.z
+        );
+
+        // Glowing material
+        const lootMat = new BABYLON.StandardMaterial('lootMat_' + loot.id, this.scene);
+        lootMat.diffuseColor = new BABYLON.Color3(1, 0.8, 0);
+        lootMat.emissiveColor = new BABYLON.Color3(0.5, 0.4, 0);
+        lootMat.specularColor = new BABYLON.Color3(1, 1, 1);
+        lootMesh.material = lootMat;
+
+        // Add floating animation
+        let time = 0;
+        const floatAnimation = () => {
+            time += this.scene.getEngine().getDeltaTime() / 1000;
+            lootMesh.position.y = 0.3 + Math.sin(time * 2) * 0.1;
+            lootMesh.rotation.y += 0.02;
+        };
+        this.scene.registerAfterRender(floatAnimation);
+
+        // Store loot data
+        this.lootDrops.set(loot.id, {
+            mesh: lootMesh,
+            data: loot,
+            animation: floatAnimation
+        });
+
+        // Check for pickup in update loop
+        lootMesh.lootId = loot.id;
+        lootMesh.isLoot = true;
+
+        console.log(`Spawned loot drop at (${loot.position.x}, ${loot.position.z}) with ${loot.weapons.length} weapons and ${loot.coins} coins`);
+    }
+
+    removeLootDrop(lootId) {
+        const lootDrop = this.lootDrops.get(lootId);
+        if (lootDrop) {
+            this.scene.unregisterAfterRender(lootDrop.animation);
+            lootDrop.mesh.dispose();
+            this.lootDrops.delete(lootId);
+        }
+    }
+
+    tryPickupLoot() {
+        if (!this.player || !this.player.mesh) return;
+
+        const playerPos = this.player.mesh.position;
+        const pickupRange = 2; // Units
+
+        for (const [lootId, lootDrop] of this.lootDrops) {
+            const distance = BABYLON.Vector3.Distance(playerPos, lootDrop.mesh.position);
+            if (distance <= pickupRange) {
+                // Send pickup request to server
+                this.socket.emit('pickupLoot', lootId);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getNearbyLoot() {
+        if (!this.player || !this.player.mesh) return null;
+
+        const playerPos = this.player.mesh.position;
+        const pickupRange = 3;
+
+        for (const [lootId, lootDrop] of this.lootDrops) {
+            const distance = BABYLON.Vector3.Distance(playerPos, lootDrop.mesh.position);
+            if (distance <= pickupRange) {
+                return lootDrop.data;
+            }
+        }
+        return null;
+    }
+
+    // Sync coins with server
+    syncCoins(coins) {
+        if (this.isConnected) {
+            this.socket.emit('coinsUpdate', coins);
+        }
+    }
+
+    // Notify server of new weapon
+    notifyWeaponAcquired(weaponKey) {
+        if (this.isConnected) {
+            this.socket.emit('weaponAcquired', weaponKey);
+        }
     }
 }

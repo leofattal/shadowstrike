@@ -1,4 +1,37 @@
 export const WeaponTypes = {
+    PISTOL: {
+        name: 'PISTOL',
+        damage: 25,
+        fireRate: 0.2,
+        maxAmmo: 12,
+        reserveAmmo: 48,
+        reloadTime: 1.5,
+        price: 0, // Starting weapon
+        hasExplosiveAmmo: false,
+        explosiveRadius: 0,
+        explosiveDamage: 0,
+        scopeType: 'pistol',
+        zoomedFOV: 0.7,
+        isMelee: false
+    },
+
+    KNIFE: {
+        name: 'KNIFE',
+        damage: 100, // One-shot kill at close range
+        fireRate: 0.5,
+        maxAmmo: 1,
+        reserveAmmo: 0,
+        reloadTime: 0,
+        price: 0, // Starting weapon
+        hasExplosiveAmmo: false,
+        explosiveRadius: 0,
+        explosiveDamage: 0,
+        scopeType: 'none',
+        zoomedFOV: 0.8,
+        isMelee: true,
+        meleeRange: 3 // 3 units range for melee attack
+    },
+
     SNIPER_RIFLE: {
         name: 'SNIPER RIFLE',
         damage: 80,

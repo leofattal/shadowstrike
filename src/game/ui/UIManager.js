@@ -19,6 +19,29 @@ export class UIManager {
         this.killstreakDisplay = document.getElementById('killstreakDisplay');
         this.killstreakText = document.getElementById('killstreakText');
         this.hitMarker = document.getElementById('hitMarker');
+        this.lootPrompt = null;
+        this.createLootPrompt();
+    }
+
+    createLootPrompt() {
+        this.lootPrompt = document.createElement('div');
+        this.lootPrompt.id = 'lootPrompt';
+        this.lootPrompt.style.cssText = `
+            position: fixed;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            padding: 15px 25px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            z-index: 3000;
+            display: none;
+        `;
+        document.body.appendChild(this.lootPrompt);
     }
 
     updateScopeVisibility(isZooming) {
@@ -144,5 +167,24 @@ export class UIManager {
     showMessage(message, duration = 3000) {
         // TODO: Implement message system
         console.log('Message:', message);
+    }
+
+    updateLootPrompt(loot) {
+        if (loot) {
+            let content = '<div style="font-size: 14px; color: #ffcc00; margin-bottom: 8px;">LOOT DROP</div>';
+
+            if (loot.weapons && loot.weapons.length > 0) {
+                content += `<div style="margin-bottom: 5px;">Weapons: ${loot.weapons.join(', ')}</div>`;
+            }
+            if (loot.coins > 0) {
+                content += `<div style="margin-bottom: 5px;">Coins: ${loot.coins}</div>`;
+            }
+            content += '<div style="font-size: 12px; color: #aaa; margin-top: 8px;">Press [E] to pickup</div>';
+
+            this.lootPrompt.innerHTML = content;
+            this.lootPrompt.style.display = 'block';
+        } else {
+            this.lootPrompt.style.display = 'none';
+        }
     }
 }

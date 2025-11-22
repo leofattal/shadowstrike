@@ -166,6 +166,28 @@ export class Game {
         if (this.inputManager.isKeyPressed('KeyG')) {
             this.spawnWave();
         }
+
+        // Weapon switching (1, 2, 3 keys)
+        if (this.inputManager.isKeyPressed('Digit1') && this.player) {
+            this.player.switchWeapon('PISTOL');
+        }
+        if (this.inputManager.isKeyPressed('Digit2') && this.player) {
+            this.player.switchWeapon('KNIFE');
+        }
+        if (this.inputManager.isKeyPressed('Digit3') && this.player) {
+            this.player.switchWeapon('SNIPER_RIFLE');
+        }
+
+        // Loot pickup (E key)
+        if (this.inputManager.isKeyPressed('KeyE') && this.networkManager) {
+            this.networkManager.tryPickupLoot();
+        }
+
+        // Show loot prompt if near loot
+        if (this.networkManager && this.uiManager) {
+            const nearbyLoot = this.networkManager.getNearbyLoot();
+            this.uiManager.updateLootPrompt(nearbyLoot);
+        }
     }
 
     spawnWave() {
