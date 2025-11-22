@@ -360,9 +360,22 @@ export class Player {
 
         const ray = new BABYLON.Ray(origin, forward, 1000);
 
-        // Check for hits first
+        // Send bullet to network if in PvP mode
+        if (this.networkManager && this.networkManager.isConnected) {
+            this.networkManager.sendShoot(origin, forward, this.weaponStats.hasExplosiveAmmo);
+        }
+
+        // Check for hits - include both enemies and remote players
         const hit = this.scene.pickWithRay(ray, (mesh) => {
-            return mesh !== this.mesh && mesh.name.startsWith('enemy');
+            // Check for AI enemies
+            if (mesh !== this.mesh && mesh.name.startsWith('enemy')) {
+                return true;
+            }
+            // Check for remote players (PvP)
+            if (mesh.isRemotePlayer) {
+                return true;
+            }
+            return false;
         });
 
         // Check if headshot
@@ -379,33 +392,53 @@ export class Player {
             setTimeout(() => rayHelper.hide(), 50);
 
             if (hit && hit.hit) {
-                console.log('Hit enemy:', hit.pickedMesh.name);
-
                 // Create bullet impact effect
                 this.createBulletImpact(hit.pickedPoint);
 
-                // Damage the enemy - check both the mesh and its parent
-                let enemyComponent = hit.pickedMesh.enemyComponent;
+                // Check if we hit a remote player (PvP)
+                if (hit.pickedMesh.isRemotePlayer) {
+                    const targetId = hit.pickedMesh.remotePlayerId;
+                    const wasHeadshot = hit.pickedMesh.isHeadshot === true;
+                    const damage = wasHeadshot ? this.damage * 2 : this.damage;
 
-                // If the mesh doesn't have the component, check its parent
-                if (!enemyComponent && hit.pickedMesh.parent) {
-                    enemyComponent = hit.pickedMesh.parent.enemyComponent;
-                }
+                    console.log('Hit remote player:', targetId, wasHeadshot ? '(HEADSHOT!)' : '');
 
-                if (enemyComponent) {
-                    const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
+                    // Send hit to server
+                    if (this.networkManager && this.networkManager.isConnected) {
+                        this.networkManager.sendHit(targetId, damage, wasHeadshot);
+                    }
 
                     // Show hit marker
                     if (this.onEnemyHit) {
                         this.onEnemyHit(wasHeadshot);
                     }
-
-                    // Check if enemy died
-                    if (!enemyComponent.alive) {
-                        this.registerKill(wasHeadshot);
-                    }
                 } else {
-                    console.log('No enemy component found on:', hit.pickedMesh.name);
+                    // Hit AI enemy
+                    console.log('Hit enemy:', hit.pickedMesh.name);
+
+                    // Damage the enemy - check both the mesh and its parent
+                    let enemyComponent = hit.pickedMesh.enemyComponent;
+
+                    // If the mesh doesn't have the component, check its parent
+                    if (!enemyComponent && hit.pickedMesh.parent) {
+                        enemyComponent = hit.pickedMesh.parent.enemyComponent;
+                    }
+
+                    if (enemyComponent) {
+                        const wasHeadshot = enemyComponent.takeDamage(this.damage, isHeadshot);
+
+                        // Show hit marker
+                        if (this.onEnemyHit) {
+                            this.onEnemyHit(wasHeadshot);
+                        }
+
+                        // Check if enemy died
+                        if (!enemyComponent.alive) {
+                            this.registerKill(wasHeadshot);
+                        }
+                    } else {
+                        console.log('No enemy component found on:', hit.pickedMesh.name);
+                    }
                 }
 
                 // Handle explosive ammo

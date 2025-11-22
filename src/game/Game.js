@@ -5,6 +5,7 @@ import { UIManager } from './ui/UIManager.js';
 import { Shop } from './ui/Shop.js';
 import { LevelManager } from './level/LevelManager.js';
 import { EnemyManager } from './entities/EnemyManager.js';
+import { NetworkManager } from './network/NetworkManager.js';
 
 export class Game {
     constructor(canvas) {
@@ -17,8 +18,10 @@ export class Game {
         this.shop = null;
         this.levelManager = null;
         this.enemyManager = null;
+        this.networkManager = null;
         this.isRunning = false;
         this.spawnPosition = null;
+        this.isPvP = false; // PvP mode flag
     }
 
     async start() {
@@ -68,7 +71,36 @@ export class Game {
         this.spawnPosition = this.levelManager.towerSpawnPosition || new BABYLON.Vector3(0, 2, 0);
         this.player.spawn(this.spawnPosition);
 
-        // Create enemy manager
+        // Check URL for PvP mode
+        const urlParams = new URLSearchParams(window.location.search);
+        this.isPvP = urlParams.get('mode') === 'pvp';
+
+        if (this.isPvP) {
+            // Initialize networking for PvP mode
+            this.networkManager = new NetworkManager(this.scene, this.player);
+            this.player.networkManager = this.networkManager;
+
+            try {
+                await this.networkManager.connect();
+                console.log('Connected to PvP server');
+
+                // Set up network callbacks
+                this.networkManager.onKillCallback = (victimName, isHeadshot) => {
+                    this.player.registerKill(isHeadshot);
+                    console.log(`Killed ${victimName}${isHeadshot ? ' (HEADSHOT!)' : ''}`);
+                };
+
+                this.networkManager.onDeathCallback = (killerName) => {
+                    this.uiManager.showDeathScreen(this.player.coins, this.player.totalKills, `Killed by ${killerName}`);
+                };
+            } catch (error) {
+                console.error('Failed to connect to PvP server:', error);
+                // Fall back to PvE mode
+                this.isPvP = false;
+            }
+        }
+
+        // Create enemy manager (for PvE or as bots in PvP)
         this.enemyManager = new EnemyManager(this.scene, this.player);
 
         // Pass shadow generator to enemy manager
@@ -76,7 +108,10 @@ export class Game {
             this.enemyManager.setShadowGenerator(this.levelManager.shadowGenerator);
         }
 
-        this.enemyManager.spawnTestEnemies();
+        // Only spawn AI enemies in PvE mode
+        if (!this.isPvP) {
+            this.enemyManager.spawnTestEnemies();
+        }
 
         // Update UI with enemy count
         this.uiManager.updateEnemyCount(this.enemyManager.getAliveCount(), this.enemyManager.getTotalCount());

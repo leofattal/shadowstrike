@@ -336,6 +336,18 @@
             animation: hitMarkerFade 0.2s ease-out forwards;
         }
 
+        @keyframes damageFlash {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+
         /* Mobile Controls */
         .mobile-controls {
             display: none;
@@ -751,6 +763,80 @@
         <div class="loading-spinner"></div>
         <div>Loading Sniper Strike...</div>
     </div>
+
+    <!-- Mode Selection Screen -->
+    <div id="modeSelect" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Courier New', monospace;
+        color: white;
+    ">
+        <h1 style="font-size: 48px; margin-bottom: 10px; text-shadow: 0 0 20px #00ff00;">🎯 SNIPER STRIKE</h1>
+        <h2 style="font-size: 24px; color: #ffcc00; margin-bottom: 40px;">Shadow Mission</h2>
+
+        <div style="display: flex; gap: 30px;">
+            <button onclick="startGame('pve')" style="
+                background: linear-gradient(to bottom, #00aa00, #006600);
+                border: 3px solid #00ff00;
+                color: white;
+                padding: 20px 40px;
+                font-size: 20px;
+                font-weight: bold;
+                cursor: pointer;
+                border-radius: 10px;
+                font-family: 'Courier New', monospace;
+                box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+                transition: all 0.3s;
+            ">
+                🤖 SOLO (PvE)<br>
+                <span style="font-size: 12px; font-weight: normal;">Fight AI Enemies</span>
+            </button>
+
+            <button onclick="startGame('pvp')" style="
+                background: linear-gradient(to bottom, #aa0000, #660000);
+                border: 3px solid #ff0000;
+                color: white;
+                padding: 20px 40px;
+                font-size: 20px;
+                font-weight: bold;
+                cursor: pointer;
+                border-radius: 10px;
+                font-family: 'Courier New', monospace;
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+                transition: all 0.3s;
+            ">
+                ⚔️ MULTIPLAYER (PvP)<br>
+                <span style="font-size: 12px; font-weight: normal;">Fight Real Players</span>
+            </button>
+        </div>
+
+        <p style="margin-top: 40px; color: #888; font-size: 14px;">
+            PvP requires running the server: <code style="color: #ffcc00;">node server.js</code>
+        </p>
+    </div>
+
+    <script>
+        function startGame(mode) {
+            document.getElementById('modeSelect').style.display = 'none';
+            if (mode === 'pvp') {
+                window.location.href = '?mode=pvp';
+            }
+        }
+
+        // Auto-hide mode select if already in game mode
+        if (window.location.search.includes('mode=pvp')) {
+            document.getElementById('modeSelect').style.display = 'none';
+        }
+    </script>
 
     <!-- Landscape Orientation Message -->
     <div class="orientation-message">
