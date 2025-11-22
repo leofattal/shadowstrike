@@ -57,10 +57,11 @@ export class LevelManager {
     }
 
     createGround() {
+        // Large Fortnite-style map (500x500)
         const ground = BABYLON.MeshBuilder.CreateGround('ground', {
-            width: 100,
-            height: 100,
-            subdivisions: 50 // More subdivisions for better detail
+            width: 500,
+            height: 500,
+            subdivisions: 100
         }, this.scene);
 
         ground.checkCollisions = true;
@@ -135,9 +136,10 @@ export class LevelManager {
     }
 
     createGridLines() {
-        const gridSize = 10;
+        // Grid for larger 500x500 map
+        const gridSize = 25;
         const gridCount = 10;
-        const lineColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+        const lineColor = new BABYLON.Color3(0.3, 0.3, 0.3);
 
         for (let i = -gridCount; i <= gridCount; i++) {
             // Lines along X axis
@@ -305,53 +307,310 @@ export class LevelManager {
     }
 
     createObstacles() {
-        // Create some boxes as cover with varied appearances
-        const boxPositions = [
-            { x: 5, z: 5 },
-            { x: -5, z: 5 },
-            { x: 5, z: -5 },
-            { x: -5, z: -5 },
-            { x: 10, z: 0 },
-            { x: -10, z: 0 },
-            { x: 0, z: 10 },
-            { x: 0, z: -10 }
+        // Create Fortnite-style buildings across the map
+        this.createBuildings();
+
+        // Create scattered cover objects
+        this.createCoverObjects();
+
+        // Create walls and barriers
+        this.createBarriers();
+    }
+
+    createBuildings() {
+        // Building locations spread across 500x500 map
+        const buildingLocations = [
+            { x: -150, z: -150, type: 'house' },
+            { x: 150, z: -150, type: 'warehouse' },
+            { x: -150, z: 150, type: 'house' },
+            { x: 150, z: 150, type: 'warehouse' },
+            { x: 0, z: 100, type: 'tower' },
+            { x: 0, z: -100, type: 'tower' },
+            { x: -100, z: 0, type: 'house' },
+            { x: 100, z: 0, type: 'warehouse' },
+            { x: -80, z: -80, type: 'house' },
+            { x: 80, z: 80, type: 'house' },
+            { x: -80, z: 80, type: 'warehouse' },
+            { x: 80, z: -80, type: 'warehouse' },
         ];
 
-        boxPositions.forEach((pos, index) => {
-            const box = BABYLON.MeshBuilder.CreateBox('obstacle', {
-                width: 2,
-                height: 1.5,
-                depth: 2
-            }, this.scene);
-
-            box.position = new BABYLON.Vector3(pos.x, 0.75, pos.z);
-            box.checkCollisions = true;
-
-            // Create enhanced material with variation
-            const material = new BABYLON.StandardMaterial('obstacleMat' + index, this.scene);
-            const colorVariation = index % 3;
-            if (colorVariation === 0) {
-                material.diffuseColor = new BABYLON.Color3(0.45, 0.35, 0.25); // Wood crate
-                material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-            } else if (colorVariation === 1) {
-                material.diffuseColor = new BABYLON.Color3(0.35, 0.35, 0.35); // Concrete
-                material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
-            } else {
-                material.diffuseColor = new BABYLON.Color3(0.5, 0.4, 0.3); // Metal container
-                material.specularColor = new BABYLON.Color3(0.4, 0.4, 0.4);
-                material.specularPower = 64;
+        buildingLocations.forEach((loc, index) => {
+            if (loc.type === 'house') {
+                this.createHouse(new BABYLON.Vector3(loc.x, 0, loc.z), index);
+            } else if (loc.type === 'warehouse') {
+                this.createWarehouse(new BABYLON.Vector3(loc.x, 0, loc.z), index);
+            } else if (loc.type === 'tower') {
+                this.createWatchTower(new BABYLON.Vector3(loc.x, 0, loc.z), index);
             }
-            material.ambientColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-            box.material = material;
+        });
+    }
 
-            // Enable shadows
-            this.shadowGenerator.addShadowCaster(box);
-            box.receiveShadows = true;
+    createHouse(position, index) {
+        // Two-story house with windows
+        const houseWidth = 12;
+        const houseDepth = 10;
+        const floorHeight = 4;
+
+        // Materials
+        const wallMat = new BABYLON.StandardMaterial('houseMat' + index, this.scene);
+        wallMat.diffuseColor = new BABYLON.Color3(0.7, 0.65, 0.6);
+        wallMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        const roofMat = new BABYLON.StandardMaterial('roofMat' + index, this.scene);
+        roofMat.diffuseColor = new BABYLON.Color3(0.4, 0.25, 0.2);
+        roofMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        // First floor walls
+        const firstFloor = BABYLON.MeshBuilder.CreateBox('house1_' + index, {
+            width: houseWidth,
+            height: floorHeight,
+            depth: houseDepth
+        }, this.scene);
+        firstFloor.position = new BABYLON.Vector3(position.x, floorHeight / 2, position.z);
+        firstFloor.material = wallMat;
+        firstFloor.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(firstFloor);
+        firstFloor.receiveShadows = true;
+
+        // Second floor
+        const secondFloor = BABYLON.MeshBuilder.CreateBox('house2_' + index, {
+            width: houseWidth,
+            height: floorHeight,
+            depth: houseDepth
+        }, this.scene);
+        secondFloor.position = new BABYLON.Vector3(position.x, floorHeight * 1.5, position.z);
+        secondFloor.material = wallMat;
+        secondFloor.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(secondFloor);
+        secondFloor.receiveShadows = true;
+
+        // Roof
+        const roof = BABYLON.MeshBuilder.CreateBox('roof_' + index, {
+            width: houseWidth + 1,
+            height: 3,
+            depth: houseDepth + 1
+        }, this.scene);
+        roof.position = new BABYLON.Vector3(position.x, floorHeight * 2 + 1.5, position.z);
+        roof.material = roofMat;
+        roof.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(roof);
+        roof.receiveShadows = true;
+
+        // Doorway (front)
+        const doorway = BABYLON.MeshBuilder.CreateBox('doorway_' + index, {
+            width: 2,
+            height: 3,
+            depth: 1
+        }, this.scene);
+        doorway.position = new BABYLON.Vector3(position.x, 1.5, position.z + houseDepth / 2);
+        const doorMat = new BABYLON.StandardMaterial('doorMat' + index, this.scene);
+        doorMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.15);
+        doorway.material = doorMat;
+    }
+
+    createWarehouse(position, index) {
+        // Large industrial warehouse
+        const warehouseWidth = 20;
+        const warehouseDepth = 15;
+        const warehouseHeight = 8;
+
+        const metalMat = new BABYLON.StandardMaterial('warehouseMat' + index, this.scene);
+        metalMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.55);
+        metalMat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+        metalMat.specularPower = 32;
+
+        // Main structure
+        const main = BABYLON.MeshBuilder.CreateBox('warehouse_' + index, {
+            width: warehouseWidth,
+            height: warehouseHeight,
+            depth: warehouseDepth
+        }, this.scene);
+        main.position = new BABYLON.Vector3(position.x, warehouseHeight / 2, position.z);
+        main.material = metalMat;
+        main.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(main);
+        main.receiveShadows = true;
+
+        // Roof overhang
+        const overhang = BABYLON.MeshBuilder.CreateBox('overhang_' + index, {
+            width: warehouseWidth + 2,
+            height: 0.5,
+            depth: warehouseDepth + 2
+        }, this.scene);
+        overhang.position = new BABYLON.Vector3(position.x, warehouseHeight + 0.25, position.z);
+        overhang.material = metalMat;
+        overhang.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(overhang);
+
+        // Loading dock
+        const dock = BABYLON.MeshBuilder.CreateBox('dock_' + index, {
+            width: 8,
+            height: 1,
+            depth: 3
+        }, this.scene);
+        dock.position = new BABYLON.Vector3(position.x, 0.5, position.z + warehouseDepth / 2 + 1.5);
+        const dockMat = new BABYLON.StandardMaterial('dockMat' + index, this.scene);
+        dockMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+        dock.material = dockMat;
+        dock.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(dock);
+    }
+
+    createWatchTower(position, index) {
+        // Tall watch tower for sniping
+        const towerHeight = 20;
+        const towerWidth = 4;
+
+        const concreteMat = new BABYLON.StandardMaterial('towerMat' + index, this.scene);
+        concreteMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.42);
+        concreteMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        // Tower base
+        const base = BABYLON.MeshBuilder.CreateBox('watchTower_' + index, {
+            width: towerWidth,
+            height: towerHeight,
+            depth: towerWidth
+        }, this.scene);
+        base.position = new BABYLON.Vector3(position.x, towerHeight / 2, position.z);
+        base.material = concreteMat;
+        base.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(base);
+        base.receiveShadows = true;
+
+        // Platform on top
+        const platform = BABYLON.MeshBuilder.CreateBox('watchPlatform_' + index, {
+            width: towerWidth + 2,
+            height: 0.5,
+            depth: towerWidth + 2
+        }, this.scene);
+        platform.position = new BABYLON.Vector3(position.x, towerHeight + 0.25, position.z);
+        platform.material = concreteMat;
+        platform.checkCollisions = true;
+        this.shadowGenerator.addShadowCaster(platform);
+
+        // Railings
+        const railMat = new BABYLON.StandardMaterial('railMat' + index, this.scene);
+        railMat.diffuseColor = new BABYLON.Color3(0.25, 0.25, 0.25);
+
+        const railings = [
+            { x: 0, z: (towerWidth + 2) / 2 },
+            { x: 0, z: -(towerWidth + 2) / 2 },
+            { x: (towerWidth + 2) / 2, z: 0, rotY: Math.PI / 2 },
+            { x: -(towerWidth + 2) / 2, z: 0, rotY: Math.PI / 2 }
+        ];
+
+        railings.forEach((r, i) => {
+            const rail = BABYLON.MeshBuilder.CreateBox('rail_' + index + '_' + i, {
+                width: towerWidth + 2,
+                height: 1,
+                depth: 0.1
+            }, this.scene);
+            rail.position = new BABYLON.Vector3(
+                position.x + r.x,
+                towerHeight + 1,
+                position.z + r.z
+            );
+            if (r.rotY) rail.rotation.y = r.rotY;
+            rail.material = railMat;
+            rail.checkCollisions = true;
+        });
+    }
+
+    createCoverObjects() {
+        // Scattered cover across the map
+        const coverPositions = [];
+
+        // Generate random cover positions
+        for (let i = 0; i < 50; i++) {
+            coverPositions.push({
+                x: (Math.random() - 0.5) * 400,
+                z: (Math.random() - 0.5) * 400,
+                type: Math.floor(Math.random() * 3)
+            });
+        }
+
+        coverPositions.forEach((pos, index) => {
+            let cover;
+            const material = new BABYLON.StandardMaterial('coverMat' + index, this.scene);
+
+            if (pos.type === 0) {
+                // Crate
+                cover = BABYLON.MeshBuilder.CreateBox('crate_' + index, {
+                    width: 2,
+                    height: 1.5,
+                    depth: 2
+                }, this.scene);
+                cover.position = new BABYLON.Vector3(pos.x, 0.75, pos.z);
+                material.diffuseColor = new BABYLON.Color3(0.45, 0.35, 0.25);
+            } else if (pos.type === 1) {
+                // Barrel
+                cover = BABYLON.MeshBuilder.CreateCylinder('barrel_' + index, {
+                    diameter: 1.2,
+                    height: 1.5
+                }, this.scene);
+                cover.position = new BABYLON.Vector3(pos.x, 0.75, pos.z);
+                material.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+            } else {
+                // Concrete barrier
+                cover = BABYLON.MeshBuilder.CreateBox('barrier_' + index, {
+                    width: 3,
+                    height: 1.2,
+                    depth: 0.8
+                }, this.scene);
+                cover.position = new BABYLON.Vector3(pos.x, 0.6, pos.z);
+                cover.rotation.y = Math.random() * Math.PI;
+                material.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+            }
+
+            material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+            cover.material = material;
+            cover.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(cover);
+            cover.receiveShadows = true;
+        });
+    }
+
+    createBarriers() {
+        // Create long walls/barriers around the map perimeter
+        const barrierMat = new BABYLON.StandardMaterial('barrierMat', this.scene);
+        barrierMat.diffuseColor = new BABYLON.Color3(0.35, 0.35, 0.35);
+
+        // Perimeter walls (low walls to mark boundaries)
+        const walls = [
+            { x: 0, z: 230, w: 460, h: 3, d: 2 },
+            { x: 0, z: -230, w: 460, h: 3, d: 2 },
+            { x: 230, z: 0, w: 2, h: 3, d: 460 },
+            { x: -230, z: 0, w: 2, h: 3, d: 460 }
+        ];
+
+        walls.forEach((w, i) => {
+            const wall = BABYLON.MeshBuilder.CreateBox('perimeterWall_' + i, {
+                width: w.w,
+                height: w.h,
+                depth: w.d
+            }, this.scene);
+            wall.position = new BABYLON.Vector3(w.x, w.h / 2, w.z);
+            wall.material = barrierMat;
+            wall.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(wall);
+            wall.receiveShadows = true;
         });
 
-        // Create some walls
-        this.createWall(new BABYLON.Vector3(15, 1, 0), 1, 2, 10);
-        this.createWall(new BABYLON.Vector3(-15, 1, 0), 1, 2, 10);
+        // Internal walls for tactical cover
+        const internalWalls = [
+            { x: 50, z: 50, rotation: 0 },
+            { x: -50, z: 50, rotation: Math.PI / 4 },
+            { x: 50, z: -50, rotation: -Math.PI / 4 },
+            { x: -50, z: -50, rotation: 0 },
+        ];
+
+        internalWalls.forEach((w, i) => {
+            const wall = this.createWall(
+                new BABYLON.Vector3(w.x, 1.5, w.z),
+                0.5, 3, 8
+            );
+            wall.rotation.y = w.rotation;
+        });
     }
 
     createWall(position, width, height, depth) {

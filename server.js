@@ -36,10 +36,10 @@ let colorIndex = 0;
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
-    // Assign player data
+    // Assign player data - spawn across larger 500x500 map
     const playerData = {
         id: socket.id,
-        position: { x: Math.random() * 40 - 20, y: 0, z: Math.random() * 40 - 20 },
+        position: { x: Math.random() * 400 - 200, y: 0, z: Math.random() * 400 - 200 },
         rotation: { x: 0, y: 0, z: 0 },
         health: 100,
         color: playerColors[colorIndex % playerColors.length],
@@ -127,9 +127,9 @@ io.on('connection', (socket) => {
                 setTimeout(() => {
                     target.health = 100;
                     target.position = {
-                        x: Math.random() * 40 - 20,
+                        x: Math.random() * 400 - 200,
                         y: 0,
-                        z: Math.random() * 40 - 20
+                        z: Math.random() * 400 - 200
                     };
 
                     io.to(data.targetId).emit('respawn', {

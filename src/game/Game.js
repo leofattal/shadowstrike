@@ -4,7 +4,6 @@ import { InputManager } from './core/InputManager.js';
 import { UIManager } from './ui/UIManager.js';
 import { Shop } from './ui/Shop.js';
 import { LevelManager } from './level/LevelManager.js';
-import { EnemyManager } from './entities/EnemyManager.js';
 import { NetworkManager } from './network/NetworkManager.js';
 
 export class Game {
@@ -17,11 +16,9 @@ export class Game {
         this.uiManager = null;
         this.shop = null;
         this.levelManager = null;
-        this.enemyManager = null;
         this.networkManager = null;
         this.isRunning = false;
         this.spawnPosition = null;
-        this.isPvP = false; // PvP mode flag
     }
 
     async start() {
@@ -71,50 +68,30 @@ export class Game {
         this.spawnPosition = this.levelManager.towerSpawnPosition || new BABYLON.Vector3(0, 2, 0);
         this.player.spawn(this.spawnPosition);
 
-        // Check URL for PvP mode
-        const urlParams = new URLSearchParams(window.location.search);
-        this.isPvP = urlParams.get('mode') === 'pvp';
+        // Initialize networking for multiplayer
+        this.networkManager = new NetworkManager(this.scene, this.player);
+        this.player.networkManager = this.networkManager;
 
-        if (this.isPvP) {
-            // Initialize networking for PvP mode
-            this.networkManager = new NetworkManager(this.scene, this.player);
-            this.player.networkManager = this.networkManager;
+        try {
+            await this.networkManager.connect();
+            console.log('Connected to PvP server');
 
-            try {
-                await this.networkManager.connect();
-                console.log('Connected to PvP server');
+            // Set up network callbacks
+            this.networkManager.onKillCallback = (victimName, isHeadshot) => {
+                this.player.registerKill(isHeadshot);
+                console.log(`Killed ${victimName}${isHeadshot ? ' (HEADSHOT!)' : ''}`);
+            };
 
-                // Set up network callbacks
-                this.networkManager.onKillCallback = (victimName, isHeadshot) => {
-                    this.player.registerKill(isHeadshot);
-                    console.log(`Killed ${victimName}${isHeadshot ? ' (HEADSHOT!)' : ''}`);
-                };
-
-                this.networkManager.onDeathCallback = (killerName) => {
-                    this.uiManager.showDeathScreen(this.player.coins, this.player.totalKills, `Killed by ${killerName}`);
-                };
-            } catch (error) {
-                console.error('Failed to connect to PvP server:', error);
-                // Fall back to PvE mode
-                this.isPvP = false;
-            }
+            this.networkManager.onDeathCallback = (killerName) => {
+                this.uiManager.showDeathScreen(this.player.coins, this.player.totalKills, `Killed by ${killerName}`);
+            };
+        } catch (error) {
+            console.error('Failed to connect to PvP server:', error);
+            alert('Could not connect to server. Make sure to run: node server.js');
         }
 
-        // Create enemy manager (for PvE or as bots in PvP)
-        this.enemyManager = new EnemyManager(this.scene, this.player);
-
-        // Pass shadow generator to enemy manager
-        if (this.levelManager.shadowGenerator) {
-            this.enemyManager.setShadowGenerator(this.levelManager.shadowGenerator);
-        }
-
-        // Only spawn AI enemies in PvE mode
-        if (!this.isPvP) {
-            this.enemyManager.spawnTestEnemies();
-        }
-
-        // Update UI with enemy count
-        this.uiManager.updateEnemyCount(this.enemyManager.getAliveCount(), this.enemyManager.getTotalCount());
+        // Update UI - no AI enemies, just player count
+        this.uiManager.updateEnemyCount(0, 0);
 
         // Lock pointer on click
         this.canvas.addEventListener('click', async () => {
@@ -147,20 +124,9 @@ export class Game {
     }
 
     update(deltaTime) {
-        // Apply time scale for slow-motion effects
-        let scaledDelta = deltaTime;
-        if (this.player && this.player.timeScale !== 1.0) {
-            scaledDelta = deltaTime * this.player.timeScale;
-        }
-
         // Update player
         if (this.player) {
-            this.player.update(deltaTime); // Player uses real time
-        }
-
-        // Update enemies with scaled time
-        if (this.enemyManager) {
-            this.enemyManager.update(scaledDelta);
+            this.player.update(deltaTime);
         }
 
         // Update UI
@@ -173,10 +139,6 @@ export class Game {
             this.uiManager.updateWeaponInfo(this.player.weaponStats.name,
                 this.player.weaponStats.hasExplosiveAmmo ? 'EXPLOSIVE' : 'STANDARD');
             this.uiManager.updateComboDisplay(this.player.comboKills, this.player.comboMultiplier, this.player.killstreak);
-        }
-
-        if (this.enemyManager && this.uiManager) {
-            this.uiManager.updateEnemyCount(this.enemyManager.getAliveCount(), this.enemyManager.getTotalCount());
         }
 
         // Check for player shooting
@@ -207,37 +169,28 @@ export class Game {
     }
 
     spawnWave() {
-        if (!this.enemyManager || !this.player) return;
+        if (!this.player) return;
 
         // Restore player ammo
         this.player.currentAmmo = this.player.weaponStats.maxAmmo;
         this.player.reserveAmmo = this.player.weaponStats.reserveAmmo;
         this.player.isReloading = false;
 
-        // Spawn 8 new enemies
-        this.enemyManager.spawnTestEnemies();
-        this.uiManager.updateEnemyCount(this.enemyManager.getAliveCount(), this.enemyManager.getTotalCount());
-
-        console.log('Spawned new wave of enemies! Ammo restored.');
+        console.log('Ammo restored!');
     }
 
     respawnLevel() {
-        if (!this.player || !this.enemyManager) return;
+        if (!this.player) return;
 
         // Hide death screen
         this.uiManager.hideDeathScreen();
 
-        // Respawn player
-        this.player.respawn(this.spawnPosition);
+        // Respawn player at random location across 500x500 map
+        const randomX = Math.random() * 400 - 200;
+        const randomZ = Math.random() * 400 - 200;
+        this.player.respawn(new BABYLON.Vector3(randomX, 0, randomZ));
 
-        // Clear all enemies
-        this.enemyManager.clearAllEnemies();
-
-        // Spawn fresh wave
-        this.enemyManager.spawnTestEnemies();
-        this.uiManager.updateEnemyCount(this.enemyManager.getAliveCount(), this.enemyManager.getTotalCount());
-
-        console.log('Level respawned!');
+        console.log('Respawned!');
     }
 
     resize() {
