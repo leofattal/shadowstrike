@@ -307,13 +307,39 @@ export class LevelManager {
     }
 
     // Helper method to create a climbable ladder
-    createLadder(position, height, name) {
+    // position: where the ladder is placed (base of ladder)
+    // height: how tall the ladder is
+    // name: unique identifier
+    // direction: 'north', 'south', 'east', 'west' - which way the player approaches from
+    createLadder(position, height, name, direction = 'south') {
         const ladderWidth = 1.5;
         const ladderPosition = new BABYLON.Vector3(position.x, height / 2, position.z);
 
         // --- Create the visual ladder ---
         const ladderMaterial = new BABYLON.StandardMaterial('ladderMat_' + name, this.scene);
         ladderMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2); // Dark metal
+
+        // Calculate offsets based on direction
+        let rampOffsetX = 0, rampOffsetZ = 0;
+        let rampRotation = 0;
+
+        if (direction === 'south') {
+            // Player approaches from +Z (south), ladder faces south
+            rampOffsetZ = 0.3;
+            rampRotation = -Math.PI / 2.2;
+        } else if (direction === 'north') {
+            // Player approaches from -Z (north)
+            rampOffsetZ = -0.3;
+            rampRotation = Math.PI / 2.2;
+        } else if (direction === 'east') {
+            // Player approaches from +X (east)
+            rampOffsetX = 0.3;
+            rampRotation = -Math.PI / 2.2;
+        } else if (direction === 'west') {
+            // Player approaches from -X (west)
+            rampOffsetX = -0.3;
+            rampRotation = Math.PI / 2.2;
+        }
 
         // Rails
         const leftRail = BABYLON.MeshBuilder.CreateBox('leftRail_' + name, { width: 0.15, height: height, depth: 0.15 }, this.scene);
@@ -338,8 +364,8 @@ export class LevelManager {
 
         // --- Create the invisible ramp for climbing ---
         const ramp = BABYLON.MeshBuilder.CreateBox('ladderRamp_' + name, { width: ladderWidth, height: 0.1, depth: height }, this.scene);
-        ramp.position = new BABYLON.Vector3(position.x, height / 2, position.z - 0.3);
-        ramp.rotation.x = -Math.PI / 2.2; // Steep angle
+        ramp.position = new BABYLON.Vector3(position.x + rampOffsetX, height / 2, position.z + rampOffsetZ);
+        ramp.rotation.x = rampRotation;
         ramp.checkCollisions = true;
         ramp.isVisible = false;
 
@@ -505,7 +531,8 @@ export class LevelManager {
         this.createLadder(
             new BABYLON.Vector3(position.x, 0, position.z - houseDepth / 2 - 0.1),
             floorHeight * 2,
-            'house_' + index
+            'house_' + index,
+            'north'  // Player approaches from the back (negative Z)
         );
     }
 
@@ -612,7 +639,8 @@ export class LevelManager {
         this.createLadder(
             new BABYLON.Vector3(position.x + warehouseWidth / 2 + 0.1, 0, position.z),
             warehouseHeight,
-            'warehouse_' + index
+            'warehouse_' + index,
+            'east'  // Player approaches from the side (positive X)
         );
     }
 
