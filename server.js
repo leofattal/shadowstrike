@@ -57,9 +57,10 @@ io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
     // Assign player data - spawn across larger 500x500 map
+    // Y = 0.9 to place capsule center above ground (capsule half-height)
     const playerData = {
         id: socket.id,
-        position: { x: Math.random() * 400 - 200, y: 0, z: Math.random() * 400 - 200 },
+        position: { x: Math.random() * 400 - 200, y: 0.9, z: Math.random() * 400 - 200 },
         rotation: { x: 0, y: 0, z: 0 },
         health: 100,
         color: playerColors[colorIndex % playerColors.length],
@@ -177,7 +178,7 @@ io.on('connection', (socket) => {
                     target.health = 100;
                     target.position = {
                         x: Math.random() * 400 - 200,
-                        y: 0,
+                        y: 0.9,
                         z: Math.random() * 400 - 200
                     };
                     // Reset to starting weapons

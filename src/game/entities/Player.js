@@ -313,11 +313,12 @@ export class Player {
     }
 
     checkGrounded() {
-        // Simple ground check - raycast downward
+        // Simple ground check - raycast downward from bottom of capsule
+        // Capsule height is 1.8, so half is 0.9. Ray starts from center, needs to reach past feet.
         const ray = new BABYLON.Ray(
             this.mesh.position,
             new BABYLON.Vector3(0, -1, 0),
-            0.95
+            1.0  // Slightly more than capsule half-height to detect ground
         );
 
         const hit = this.scene.pickWithRay(ray, (mesh) => {

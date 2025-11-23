@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import * as BABYLON from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 
 export class NetworkManager {
     constructor(scene, player) {
@@ -207,8 +208,8 @@ export class NetworkManager {
         }, 50);
     }
 
-    spawnRemotePlayer(playerData) {
-        // Create remote player mesh
+    async spawnRemotePlayer(playerData) {
+        // Create remote player container
         const mesh = new BABYLON.TransformNode('remotePlayer_' + playerData.id, this.scene);
         mesh.position = new BABYLON.Vector3(
             playerData.position.x,
@@ -216,66 +217,111 @@ export class NetworkManager {
             playerData.position.z
         );
 
-        // Body
-        const body = BABYLON.MeshBuilder.CreateCapsule('body', {
-            radius: 0.25,
-            height: 0.8
-        }, this.scene);
-        body.position.y = 1.3;
-        body.parent = mesh;
+        // Store player data immediately so we can update position while model loads
+        const remotePlayerData = {
+            mesh: mesh,
+            parts: [],
+            data: playerData,
+            modelLoaded: false
+        };
+        this.remotePlayers.set(playerData.id, remotePlayerData);
 
-        const bodyMat = new BABYLON.StandardMaterial('bodyMat', this.scene);
-        bodyMat.diffuseColor = new BABYLON.Color3(
-            playerData.color.r,
-            playerData.color.g,
-            playerData.color.b
-        );
-        body.material = bodyMat;
+        // Load the low poly person model
+        try {
+            const result = await BABYLON.SceneLoader.ImportMeshAsync(
+                '',
+                '/models/',
+                'scene.gltf',
+                this.scene
+            );
 
-        // Head
-        const head = BABYLON.MeshBuilder.CreateSphere('head', {
-            diameter: 0.35
-        }, this.scene);
-        head.position.y = 1.85;
-        head.parent = mesh;
+            // Parent all loaded meshes to our container
+            const loadedMeshes = result.meshes;
+            loadedMeshes.forEach(loadedMesh => {
+                loadedMesh.parent = mesh;
+            });
 
-        const headMat = new BABYLON.StandardMaterial('headMat', this.scene);
-        headMat.diffuseColor = new BABYLON.Color3(0.9, 0.75, 0.6);
-        head.material = headMat;
+            // Scale and position the model appropriately
+            // Adjust these values based on the model's actual size
+            const modelRoot = loadedMeshes[0];
+            modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
+            modelRoot.position.y = 0;
 
-        // Arms
-        const leftArm = BABYLON.MeshBuilder.CreateCapsule('leftArm', {
-            radius: 0.08,
-            height: 0.5
-        }, this.scene);
-        leftArm.position = new BABYLON.Vector3(-0.35, 1.2, 0);
-        leftArm.parent = mesh;
-        leftArm.material = bodyMat;
+            // Apply player color to the model
+            const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);
+            colorMat.diffuseColor = new BABYLON.Color3(
+                playerData.color.r,
+                playerData.color.g,
+                playerData.color.b
+            );
 
-        const rightArm = BABYLON.MeshBuilder.CreateCapsule('rightArm', {
-            radius: 0.08,
-            height: 0.5
-        }, this.scene);
-        rightArm.position = new BABYLON.Vector3(0.35, 1.2, 0);
-        rightArm.parent = mesh;
-        rightArm.material = bodyMat;
+            // Apply color to all meshes in the model
+            loadedMeshes.forEach(loadedMesh => {
+                if (loadedMesh.material) {
+                    loadedMesh.material = colorMat;
+                }
+            });
 
-        // Legs
-        const leftLeg = BABYLON.MeshBuilder.CreateCapsule('leftLeg', {
-            radius: 0.1,
-            height: 0.6
-        }, this.scene);
-        leftLeg.position = new BABYLON.Vector3(-0.15, 0.5, 0);
-        leftLeg.parent = mesh;
-        leftLeg.material = bodyMat;
+            // Create hitbox for hit detection (invisible)
+            const hitbox = BABYLON.MeshBuilder.CreateBox('hitbox_' + playerData.id, {
+                width: 0.6,
+                height: 1.8,
+                depth: 0.6
+            }, this.scene);
+            hitbox.position.y = 0.9;
+            hitbox.parent = mesh;
+            hitbox.isVisible = false;
+            hitbox.isRemotePlayer = true;
+            hitbox.remotePlayerId = playerData.id;
+            hitbox.isHeadshot = false;
 
-        const rightLeg = BABYLON.MeshBuilder.CreateCapsule('rightLeg', {
-            radius: 0.1,
-            height: 0.6
-        }, this.scene);
-        rightLeg.position = new BABYLON.Vector3(0.15, 0.5, 0);
-        rightLeg.parent = mesh;
-        rightLeg.material = bodyMat;
+            // Create headshot hitbox
+            const headHitbox = BABYLON.MeshBuilder.CreateSphere('headHitbox_' + playerData.id, {
+                diameter: 0.4
+            }, this.scene);
+            headHitbox.position.y = 1.7;
+            headHitbox.parent = mesh;
+            headHitbox.isVisible = false;
+            headHitbox.isRemotePlayer = true;
+            headHitbox.remotePlayerId = playerData.id;
+            headHitbox.isHeadshot = true;
+
+            // Store parts for hit detection
+            remotePlayerData.parts = [hitbox, headHitbox, ...loadedMeshes];
+            remotePlayerData.modelLoaded = true;
+
+            // Mark all model meshes for hit detection
+            loadedMeshes.forEach(loadedMesh => {
+                loadedMesh.isRemotePlayer = true;
+                loadedMesh.remotePlayerId = playerData.id;
+                loadedMesh.isHeadshot = false;
+            });
+
+        } catch (error) {
+            console.error('Failed to load player model, using fallback:', error);
+            // Fallback to simple capsule if model fails to load
+            const fallbackBody = BABYLON.MeshBuilder.CreateCapsule('fallbackBody', {
+                radius: 0.3,
+                height: 1.8
+            }, this.scene);
+            fallbackBody.position.y = 0.9;
+            fallbackBody.parent = mesh;
+
+            const fallbackMat = new BABYLON.StandardMaterial('fallbackMat', this.scene);
+            fallbackMat.diffuseColor = new BABYLON.Color3(
+                playerData.color.r,
+                playerData.color.g,
+                playerData.color.b
+            );
+            fallbackBody.material = fallbackMat;
+
+            fallbackBody.isRemotePlayer = true;
+            fallbackBody.remotePlayerId = playerData.id;
+            fallbackBody.isHeadshot = false;
+
+            remotePlayerData.parts = [fallbackBody];
+            remotePlayerData.modelLoaded = true;
+        }
 
         // Username label
         const plane = BABYLON.MeshBuilder.CreatePlane('nameLabel', {
@@ -298,20 +344,6 @@ export class NetworkManager {
         nameMat.emissiveTexture = nameTexture;
         nameMat.opacityTexture = nameTexture;
         plane.material = nameMat;
-
-        // Store parts for hit detection
-        const parts = [body, head, leftArm, rightArm, leftLeg, rightLeg];
-        parts.forEach(part => {
-            part.isRemotePlayer = true;
-            part.remotePlayerId = playerData.id;
-            part.isHeadshot = part === head;
-        });
-
-        this.remotePlayers.set(playerData.id, {
-            mesh: mesh,
-            parts: parts,
-            data: playerData
-        });
 
         console.log('Spawned remote player:', playerData.username);
     }
