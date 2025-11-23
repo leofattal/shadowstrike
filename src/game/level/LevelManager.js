@@ -375,6 +375,10 @@ export class LevelManager {
         ladderTrigger.position = new BABYLON.Vector3(ladderPosition.x, ladderPosition.y, ladderPosition.z);
         ladderTrigger.checkCollisions = false;
         ladderTrigger.isVisible = false;
+
+        // Store ladder metadata for climbing system
+        ladderTrigger.ladderDirection = direction;
+        ladderTrigger.ladderHeight = height;
     }
 
     createObstacles() {
@@ -528,12 +532,12 @@ export class LevelManager {
         stairs.material = floorMat;
         stairs.checkCollisions = true;
 
-        // Add exterior ladder on the back of the house for roof access
+        // Add exterior ladder on the front of the house for roof access
         this.createLadder(
-            new BABYLON.Vector3(position.x, 0, position.z - houseDepth / 2 - 0.1),
+            new BABYLON.Vector3(position.x - houseWidth / 2 - 0.1, 0, position.z),
             floorHeight * 2,
             'house_' + index,
-            'north'  // Player approaches from the back (negative Z)
+            'west'  // Player approaches from outside the house (negative X)
         );
     }
 
@@ -636,12 +640,12 @@ export class LevelManager {
             this.shadowGenerator.addShadowCaster(crate);
         });
 
-        // Add ladder on the side of the warehouse for roof access
+        // Add ladder on the back of the warehouse for roof access
         this.createLadder(
-            new BABYLON.Vector3(position.x + warehouseWidth / 2 + 0.1, 0, position.z),
+            new BABYLON.Vector3(position.x, 0, position.z - warehouseDepth / 2 - 0.1),
             warehouseHeight,
             'warehouse_' + index,
-            'east'  // Player approaches from the side (positive X)
+            'north'  // Player approaches from behind the warehouse
         );
     }
 

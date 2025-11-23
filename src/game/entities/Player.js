@@ -39,7 +39,7 @@ export class Player {
         // Ladder climbing properties
         this.isClimbingLadder = false;
         this.ladderClimbSpeed = 5.0;
-        this.ladderTrigger = null;
+        this.ladderTriggers = []; // Array of all ladder triggers
         this.ladderTopPosition = null;
 
         // Camera properties
@@ -106,16 +106,11 @@ export class Player {
         this.camera.checkCollisions = true;
         this.camera.applyGravity = false; // We'll handle gravity manually
 
-        // Find ladder trigger and define top position
-        this.ladderTrigger = this.scene.getMeshByName('ladderTrigger');
-        if (this.ladderTrigger) {
-            const towerHeight = 15; // From LevelManager
-            this.ladderTopPosition = new BABYLON.Vector3(
-                this.ladderTrigger.position.x,
-                towerHeight + 1,
-                this.ladderTrigger.position.z - 0.5
-            );
-        }
+        // Find ALL ladder triggers in the scene
+        this.ladderTriggers = this.scene.meshes.filter(mesh =>
+            mesh.name.startsWith('ladderTrigger')
+        );
+        console.log(`Found ${this.ladderTriggers.length} ladder triggers`);
 
         // Load shooting sound
         this.shootSound = new BABYLON.Sound(
@@ -286,13 +281,45 @@ export class Player {
 
         // Handle jump and ladder climb trigger
         if (this.inputManager.isJumpPressed()) {
-            // Check for ladder climb
-            if (this.ladderTrigger && this.mesh.intersectsMesh(this.ladderTrigger, false)) {
-                this.isClimbingLadder = true;
-                this.velocity.y = 0; // Stop any falling momentum
+            // Check for ladder climb - check ALL ladder triggers
+            let foundLadder = false;
+            for (const trigger of this.ladderTriggers) {
+                if (this.mesh.intersectsMesh(trigger, false)) {
+                    // Get ladder height from metadata or bounding box
+                    const ladderHeight = trigger.ladderHeight ||
+                        (trigger.getBoundingInfo().boundingBox.extendSize.y * 2);
+                    const topY = trigger.position.y + ladderHeight / 2 + 1;
+
+                    // Calculate step-off position based on ladder direction
+                    let stepOffX = 0, stepOffZ = 0;
+                    const direction = trigger.ladderDirection || 'south';
+
+                    if (direction === 'south') {
+                        stepOffZ = -0.5; // Step north (away from ladder)
+                    } else if (direction === 'north') {
+                        stepOffZ = 0.5; // Step south
+                    } else if (direction === 'east') {
+                        stepOffX = -0.5; // Step west
+                    } else if (direction === 'west') {
+                        stepOffX = 0.5; // Step east
+                    }
+
+                    this.ladderTopPosition = new BABYLON.Vector3(
+                        trigger.position.x + stepOffX,
+                        topY,
+                        trigger.position.z + stepOffZ
+                    );
+
+                    this.isClimbingLadder = true;
+                    this.velocity.y = 0; // Stop any falling momentum
+                    foundLadder = true;
+                    console.log(`Climbing ladder: ${trigger.name} to height ${topY}`);
+                    break;
+                }
             }
-            // Handle normal jump
-            else if (this.isGrounded) {
+
+            // Handle normal jump if not climbing
+            if (!foundLadder && this.isGrounded) {
                 this.velocity.y = this.jumpForce;
                 this.isGrounded = false;
             }
