@@ -321,24 +321,24 @@ export class LevelManager {
 
         // Calculate offsets based on direction
         let rampOffsetX = 0, rampOffsetZ = 0;
-        let rampRotation = 0;
+        let rampRotationX = 0, rampRotationZ = 0;
 
         if (direction === 'south') {
             // Player approaches from +Z (south), ladder faces south
             rampOffsetZ = 0.3;
-            rampRotation = -Math.PI / 2.2;
+            rampRotationX = -Math.PI / 2.2;
         } else if (direction === 'north') {
             // Player approaches from -Z (north)
             rampOffsetZ = -0.3;
-            rampRotation = Math.PI / 2.2;
+            rampRotationX = Math.PI / 2.2;
         } else if (direction === 'east') {
             // Player approaches from +X (east)
             rampOffsetX = 0.3;
-            rampRotation = -Math.PI / 2.2;
+            rampRotationZ = Math.PI / 2.2;
         } else if (direction === 'west') {
             // Player approaches from -X (west)
             rampOffsetX = -0.3;
-            rampRotation = Math.PI / 2.2;
+            rampRotationZ = -Math.PI / 2.2;
         }
 
         // Rails
@@ -365,7 +365,8 @@ export class LevelManager {
         // --- Create the invisible ramp for climbing ---
         const ramp = BABYLON.MeshBuilder.CreateBox('ladderRamp_' + name, { width: ladderWidth, height: 0.1, depth: height }, this.scene);
         ramp.position = new BABYLON.Vector3(position.x + rampOffsetX, height / 2, position.z + rampOffsetZ);
-        ramp.rotation.x = rampRotation;
+        ramp.rotation.x = rampRotationX;
+        ramp.rotation.z = rampRotationZ;
         ramp.checkCollisions = true;
         ramp.isVisible = false;
 
