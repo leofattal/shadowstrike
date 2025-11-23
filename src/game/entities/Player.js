@@ -26,9 +26,9 @@ export class Player {
         this.maxAmmo = this.weaponStats.maxAmmo;
 
         // Movement properties
-        this.moveSpeed = 4.0;
-        this.sprintSpeed = 7.0;
-        this.crouchSpeed = 2.0;
+        this.moveSpeed = 8.0;
+        this.sprintSpeed = 14.0;
+        this.crouchSpeed = 4.0;
         this.jumpForce = 5.0;
         this.isGrounded = false;
         this.isCrouching = false;

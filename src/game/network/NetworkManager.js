@@ -601,15 +601,20 @@ export class NetworkManager {
     }
 
     tryPickupLoot() {
-        if (!this.player || !this.player.mesh) return;
+        if (!this.player || !this.player.mesh) return false;
 
         const playerPos = this.player.mesh.position;
-        const pickupRange = 2; // Units
+        const pickupRange = 4; // Units - increased for easier pickup
+
+        console.log('Trying to pickup loot, player at:', playerPos.x, playerPos.y, playerPos.z);
+        console.log('Loot drops available:', this.lootDrops.size);
 
         for (const [lootId, lootDrop] of this.lootDrops) {
             const distance = BABYLON.Vector3.Distance(playerPos, lootDrop.mesh.position);
+            console.log(`Loot ${lootId} at distance: ${distance}`);
             if (distance <= pickupRange) {
                 // Send pickup request to server
+                console.log('Picking up loot:', lootId);
                 this.socket.emit('pickupLoot', lootId);
                 return true;
             }
@@ -621,7 +626,7 @@ export class NetworkManager {
         if (!this.player || !this.player.mesh) return null;
 
         const playerPos = this.player.mesh.position;
-        const pickupRange = 3;
+        const pickupRange = 5; // Slightly larger than pickup range to show prompt early
 
         for (const [lootId, lootDrop] of this.lootDrops) {
             const distance = BABYLON.Vector3.Distance(playerPos, lootDrop.mesh.position);

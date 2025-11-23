@@ -180,6 +180,7 @@ export class Game {
 
         // Loot pickup (E key)
         if (this.inputManager.isKeyPressed('KeyE') && this.networkManager) {
+            console.log('E key pressed - attempting loot pickup');
             this.networkManager.tryPickupLoot();
         }
 
