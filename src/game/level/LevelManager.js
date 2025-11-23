@@ -371,7 +371,21 @@ export class LevelManager {
         ramp.isVisible = false;
 
         // --- Create a trigger volume for the ladder ---
-        const ladderTrigger = BABYLON.MeshBuilder.CreateBox('ladderTrigger_' + name, { width: ladderWidth + 1, height: height, depth: 2 }, this.scene);
+        // Adjust trigger dimensions based on direction so it extends toward the player
+        let triggerWidth, triggerDepth;
+        if (direction === 'east' || direction === 'west') {
+            triggerWidth = 2;  // Extends on X axis toward player
+            triggerDepth = ladderWidth + 1;
+        } else {
+            triggerWidth = ladderWidth + 1;
+            triggerDepth = 2;  // Extends on Z axis toward player
+        }
+
+        const ladderTrigger = BABYLON.MeshBuilder.CreateBox('ladderTrigger_' + name, {
+            width: triggerWidth,
+            height: height,
+            depth: triggerDepth
+        }, this.scene);
         ladderTrigger.position = new BABYLON.Vector3(ladderPosition.x, ladderPosition.y, ladderPosition.z);
         ladderTrigger.checkCollisions = false;
         ladderTrigger.isVisible = false;
