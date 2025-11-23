@@ -17,7 +17,20 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // Serve index.html for root path
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    res.sendFile(indexPath, (err) => {
+        if (err) {
+            console.error('Error serving index.html:', err);
+            res.status(500).send(`
+                <h1>Build Error</h1>
+                <p>The dist/index.html file was not found.</p>
+                <p>This usually means the build command did not run.</p>
+                <p>Please check that your Render Build Command is set to:</p>
+                <pre>npm install && npm run build</pre>
+                <p>Looking for: ${indexPath}</p>
+            `);
+        }
+    });
 });
 
 // Game state
