@@ -306,6 +306,50 @@ export class LevelManager {
         this.towerSpawnPosition = new BABYLON.Vector3(towerPosition.x, towerHeight + 2, towerPosition.z);
     }
 
+    // Helper method to create a climbable ladder
+    createLadder(position, height, name) {
+        const ladderWidth = 1.5;
+        const ladderPosition = new BABYLON.Vector3(position.x, height / 2, position.z);
+
+        // --- Create the visual ladder ---
+        const ladderMaterial = new BABYLON.StandardMaterial('ladderMat_' + name, this.scene);
+        ladderMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2); // Dark metal
+
+        // Rails
+        const leftRail = BABYLON.MeshBuilder.CreateBox('leftRail_' + name, { width: 0.15, height: height, depth: 0.15 }, this.scene);
+        leftRail.position = new BABYLON.Vector3(ladderPosition.x - ladderWidth / 2, ladderPosition.y, ladderPosition.z);
+        leftRail.material = ladderMaterial;
+        this.shadowGenerator.addShadowCaster(leftRail);
+
+        const rightRail = BABYLON.MeshBuilder.CreateBox('rightRail_' + name, { width: 0.15, height: height, depth: 0.15 }, this.scene);
+        rightRail.position = new BABYLON.Vector3(ladderPosition.x + ladderWidth / 2, ladderPosition.y, ladderPosition.z);
+        rightRail.material = ladderMaterial;
+        this.shadowGenerator.addShadowCaster(rightRail);
+
+        // Rungs
+        const rungCount = Math.floor(height);
+        for (let i = 0; i < rungCount; i++) {
+            const rung = BABYLON.MeshBuilder.CreateBox(`rung_${name}_${i}`, { width: ladderWidth, height: 0.1, depth: 0.1 }, this.scene);
+            const y = (i / (rungCount - 1)) * (height - 1) + 0.5;
+            rung.position = new BABYLON.Vector3(ladderPosition.x, y, ladderPosition.z);
+            rung.material = ladderMaterial;
+            this.shadowGenerator.addShadowCaster(rung);
+        }
+
+        // --- Create the invisible ramp for climbing ---
+        const ramp = BABYLON.MeshBuilder.CreateBox('ladderRamp_' + name, { width: ladderWidth, height: 0.1, depth: height }, this.scene);
+        ramp.position = new BABYLON.Vector3(position.x, height / 2, position.z - 0.3);
+        ramp.rotation.x = -Math.PI / 2.2; // Steep angle
+        ramp.checkCollisions = true;
+        ramp.isVisible = false;
+
+        // --- Create a trigger volume for the ladder ---
+        const ladderTrigger = BABYLON.MeshBuilder.CreateBox('ladderTrigger_' + name, { width: ladderWidth + 1, height: height, depth: 2 }, this.scene);
+        ladderTrigger.position = new BABYLON.Vector3(ladderPosition.x, ladderPosition.y, ladderPosition.z);
+        ladderTrigger.checkCollisions = false;
+        ladderTrigger.isVisible = false;
+    }
+
     createObstacles() {
         // Create Fortnite-style buildings across the map
         this.createBuildings();
@@ -456,6 +500,13 @@ export class LevelManager {
         stairs.rotation.x = -Math.PI / 6; // Ramp angle
         stairs.material = floorMat;
         stairs.checkCollisions = true;
+
+        // Add exterior ladder on the back of the house for roof access
+        this.createLadder(
+            new BABYLON.Vector3(position.x, 0, position.z - houseDepth / 2 - 0.1),
+            floorHeight * 2,
+            'house_' + index
+        );
     }
 
     createWarehouse(position, index) {
@@ -556,6 +607,13 @@ export class LevelManager {
             crate.checkCollisions = true;
             this.shadowGenerator.addShadowCaster(crate);
         });
+
+        // Add ladder on the side of the warehouse for roof access
+        this.createLadder(
+            new BABYLON.Vector3(position.x + warehouseWidth / 2 + 0.1, 0, position.z),
+            warehouseHeight,
+            'warehouse_' + index
+        );
     }
 
     createWatchTower(position, index) {
@@ -616,6 +674,13 @@ export class LevelManager {
             rail.material = railMat;
             rail.checkCollisions = true;
         });
+
+        // Add ladder to the watch tower
+        this.createLadder(
+            new BABYLON.Vector3(position.x, 0, position.z + towerWidth / 2 + 0.1),
+            towerHeight,
+            'watchTower_' + index
+        );
     }
 
     createCoverObjects() {
@@ -712,6 +777,53 @@ export class LevelManager {
                 0.5, 3, 8
             );
             wall.rotation.y = w.rotation;
+        });
+
+        // Add standalone ladders at strategic positions around the map
+        // These lead up to elevated platforms for sniping positions
+        const standaloneLadderPositions = [
+            { x: -200, z: -200, height: 12 },
+            { x: 200, z: 200, height: 12 },
+            { x: -200, z: 200, height: 10 },
+            { x: 200, z: -200, height: 10 },
+            { x: 0, z: 180, height: 8 },
+            { x: 0, z: -180, height: 8 },
+            { x: 180, z: 0, height: 10 },
+            { x: -180, z: 0, height: 10 },
+        ];
+
+        standaloneLadderPositions.forEach((pos, index) => {
+            // Create a small platform at the top
+            const platformMat = new BABYLON.StandardMaterial('standalonePlatformMat_' + index, this.scene);
+            platformMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.32);
+
+            const platform = BABYLON.MeshBuilder.CreateBox('standalonePlatform_' + index, {
+                width: 4,
+                height: 0.5,
+                depth: 4
+            }, this.scene);
+            platform.position = new BABYLON.Vector3(pos.x, pos.height, pos.z);
+            platform.material = platformMat;
+            platform.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(platform);
+
+            // Create support pole
+            const pole = BABYLON.MeshBuilder.CreateBox('standalonePole_' + index, {
+                width: 0.5,
+                height: pos.height,
+                depth: 0.5
+            }, this.scene);
+            pole.position = new BABYLON.Vector3(pos.x, pos.height / 2, pos.z);
+            pole.material = platformMat;
+            pole.checkCollisions = true;
+            this.shadowGenerator.addShadowCaster(pole);
+
+            // Create the ladder
+            this.createLadder(
+                new BABYLON.Vector3(pos.x, 0, pos.z + 2.1),
+                pos.height,
+                'standalone_' + index
+            );
         });
     }
 
