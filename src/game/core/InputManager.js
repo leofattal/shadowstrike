@@ -159,26 +159,55 @@ export class InputManager {
         // Setup orientation detection
         this.setupOrientationDetection();
 
-        // Virtual Joystick
+        // Virtual Joystick - Dynamic positioning (appears where you touch)
         const joystickZone = document.getElementById('joystickZone');
+        const joystickBase = joystickZone.querySelector('.joystick-base');
         const joystickStick = document.getElementById('joystickStick');
         let joystickActive = false;
         let joystickCenter = { x: 0, y: 0 };
+        let joystickTouchId = null;
         const joystickMaxDistance = 45; // pixels
 
         const startJoystick = (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
             joystickActive = true;
-            const rect = joystickZone.getBoundingClientRect();
+
+            // Position joystick where user touched
             joystickCenter = {
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2
+                x: touch.clientX,
+                y: touch.clientY
             };
+
+            // Move the visual joystick to touch position
+            joystickBase.style.left = `${touch.clientX - 75}px`;
+            joystickBase.style.top = `${touch.clientY - 75}px`;
+            joystickBase.style.position = 'fixed';
+            joystickStick.style.left = `${touch.clientX}px`;
+            joystickStick.style.top = `${touch.clientY}px`;
+            joystickStick.style.position = 'fixed';
+            joystickStick.style.transform = 'translate(-50%, -50%)';
+
+            // Show the joystick
+            joystickBase.style.opacity = '1';
+            joystickStick.style.opacity = '1';
         };
 
         const moveJoystick = (e) => {
             if (!joystickActive) return;
+            e.preventDefault();
 
-            const touch = e.touches ? e.touches[0] : e;
+            // Find the correct touch
+            let touch = null;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === joystickTouchId) {
+                    touch = e.touches[i];
+                    break;
+                }
+            }
+            if (!touch) return;
+
             const deltaX = touch.clientX - joystickCenter.x;
             const deltaY = touch.clientY - joystickCenter.y;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -186,23 +215,39 @@ export class InputManager {
             if (distance > joystickMaxDistance) {
                 this.joystick.x = (deltaX / distance) * 1.0;
                 this.joystick.y = (deltaY / distance) * 1.0;
-                joystickStick.style.transform = `translate(-50%, -50%) translate(${(deltaX / distance) * joystickMaxDistance}px, ${(deltaY / distance) * joystickMaxDistance}px)`;
+                joystickStick.style.left = `${joystickCenter.x + (deltaX / distance) * joystickMaxDistance}px`;
+                joystickStick.style.top = `${joystickCenter.y + (deltaY / distance) * joystickMaxDistance}px`;
             } else {
                 this.joystick.x = deltaX / joystickMaxDistance;
                 this.joystick.y = deltaY / joystickMaxDistance;
-                joystickStick.style.transform = `translate(-50%, -50%) translate(${deltaX}px, ${deltaY}px)`;
+                joystickStick.style.left = `${touch.clientX}px`;
+                joystickStick.style.top = `${touch.clientY}px`;
             }
         };
 
-        const endJoystick = () => {
+        const endJoystick = (e) => {
+            // Check if the ended touch is our joystick touch
+            let found = false;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && e.type !== 'touchcancel') return;
+
             joystickActive = false;
+            joystickTouchId = null;
             this.joystick.x = 0;
             this.joystick.y = 0;
-            joystickStick.style.transform = 'translate(-50%, -50%)';
+
+            // Hide joystick
+            joystickBase.style.opacity = '0';
+            joystickStick.style.opacity = '0';
         };
 
-        joystickZone.addEventListener('touchstart', startJoystick);
-        joystickZone.addEventListener('touchmove', moveJoystick);
+        joystickZone.addEventListener('touchstart', startJoystick, { passive: false });
+        joystickZone.addEventListener('touchmove', moveJoystick, { passive: false });
         joystickZone.addEventListener('touchend', endJoystick);
         joystickZone.addEventListener('touchcancel', endJoystick);
 
