@@ -110,13 +110,20 @@ export class NetworkManager {
 
             this.socket.on('respawn', (data) => {
                 console.log('Respawning at:', data.position);
-                this.player.mesh.position = new BABYLON.Vector3(
+
+                // Respawn player at new position
+                this.player.respawn(new BABYLON.Vector3(
                     data.position.x,
                     data.position.y,
                     data.position.z
-                );
-                this.player.health = data.health;
-                this.player.updateHealthUI();
+                ));
+
+                // Update weapons back to starting loadout
+                this.player.ownedWeapons = data.weapons;
+                this.player.switchWeapon('PISTOL'); // Switch to pistol on respawn
+
+                // Keep coins! Server preserves them
+                this.player.coins = data.coins;
             });
 
             this.socket.on('playerRespawned', (data) => {
@@ -241,11 +248,13 @@ export class NetworkManager {
                 loadedMesh.parent = mesh;
             });
 
-            // Scale and position the model appropriately
+            // Scale, rotate and position the model appropriately
             // Adjust these values based on the model's actual size
             const modelRoot = loadedMeshes[0];
             modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
             modelRoot.position.y = 0;
+            // Rotate model to stand upright (models often import lying down)
+            modelRoot.rotation.x = -Math.PI / 2; // Rotate 90 degrees to stand up
 
             // Apply player color to the model
             const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);

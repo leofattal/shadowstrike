@@ -112,17 +112,36 @@ export class UIManager {
         this.coinsText.textContent = `💰 ${amount}`;
     }
 
-    showDeathScreen(coins, enemiesKilled) {
+    showDeathScreen(coins, enemiesKilled, killerMessage = '') {
         this.deathScreen.style.display = 'block';
         this.deathStats.innerHTML = `
-            <div>Coins Earned: 💰 ${coins}</div>
-            <div style="margin-top: 10px;">Enemies Killed: ☠️ ${enemiesKilled}</div>
+            ${killerMessage ? `<div style="color: #ff6666; margin-bottom: 10px;">${killerMessage}</div>` : ''}
+            <div>Coins: 💰 ${coins}</div>
+            <div style="margin-top: 10px;">Kills: ☠️ ${enemiesKilled}</div>
+            <div id="respawn-countdown" style="margin-top: 20px; font-size: 48px; color: #00ff00;">3</div>
         `;
 
         // Release pointer lock
         if (document.pointerLockElement) {
             document.exitPointerLock();
         }
+
+        // Start countdown
+        let countdown = 3;
+        const countdownElement = document.getElementById('respawn-countdown');
+
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                countdownElement.textContent = countdown;
+            } else {
+                countdownElement.textContent = 'RESPAWNING...';
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+
+        // Store interval ID so we can clear it if needed
+        this.currentCountdownInterval = countdownInterval;
     }
 
     hideDeathScreen() {

@@ -140,7 +140,8 @@ io.on('connection', (socket) => {
                 target.deaths++;
 
                 // Create loot drop at victim's position
-                const droppedWeapons = target.weapons.filter(w => w !== 'PISTOL' && w !== 'KNIFE');
+                // Filter out starting weapons: PISTOL, KNIFE, and SNIPER_RIFLE
+                const droppedWeapons = target.weapons.filter(w => w !== 'PISTOL' && w !== 'KNIFE' && w !== 'SNIPER_RIFLE');
                 if (droppedWeapons.length > 0 || target.coins > 0) {
                     const lootId = 'loot_' + (lootIdCounter++);
                     const loot = {
@@ -173,7 +174,7 @@ io.on('connection', (socket) => {
                     isHeadshot: data.isHeadshot || false
                 });
 
-                // Respawn the killed player after delay
+                // Respawn the killed player after delay (3 second countdown)
                 setTimeout(() => {
                     target.health = 100;
                     target.position = {
@@ -184,7 +185,7 @@ io.on('connection', (socket) => {
                     // Reset to starting weapons
                     target.weapons = ['PISTOL', 'KNIFE', 'SNIPER_RIFLE'];
                     target.currentWeapon = 'PISTOL';
-                    target.coins = 0;
+                    // Keep coins! Don't reset to 0
 
                     io.to(data.targetId).emit('respawn', {
                         position: target.position,

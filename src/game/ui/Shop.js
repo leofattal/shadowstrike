@@ -305,9 +305,15 @@ export class Shop {
         if (this.player.coins >= weapon.price) {
             this.player.coins -= weapon.price;
             if (!this.player.ownedWeapons) {
-                this.player.ownedWeapons = ['ASSAULT_RIFLE']; // Default weapon
+                this.player.ownedWeapons = ['PISTOL', 'KNIFE', 'SNIPER_RIFLE']; // Default weapons
             }
             this.player.ownedWeapons.push(weaponKey);
+
+            // Notify server of weapon acquisition
+            if (this.player.networkManager) {
+                this.player.networkManager.notifyWeaponAcquired(weaponKey);
+            }
+
             console.log(`Purchased ${weapon.name}!`);
             this.refresh();
         } else {
