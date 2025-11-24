@@ -111,6 +111,11 @@ export class NetworkManager {
             this.socket.on('respawn', (data) => {
                 console.log('Respawning at:', data.position);
 
+                // Hide death screen and clear countdown
+                if (this.onRespawnCallback) {
+                    this.onRespawnCallback();
+                }
+
                 // Respawn player at new position
                 this.player.respawn(new BABYLON.Vector3(
                     data.position.x,
@@ -252,9 +257,9 @@ export class NetworkManager {
             // Adjust these values based on the model's actual size
             const modelRoot = loadedMeshes[0];
             modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
-            modelRoot.position.y = 0;
-            // Rotate model to stand upright (models often import lying down)
-            modelRoot.rotation.x = -Math.PI / 2; // Rotate 90 degrees to stand up
+            modelRoot.position.y = -0.9; // Lower the model so feet are on ground
+            // Rotate model to stand upright - try Z axis rotation instead
+            modelRoot.rotation.z = Math.PI / 2; // Rotate 90 degrees on Z axis to stand up
 
             // Apply player color to the model
             const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);

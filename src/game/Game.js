@@ -83,7 +83,11 @@ export class Game {
             };
 
             this.networkManager.onDeathCallback = (killerName) => {
-                this.uiManager.showDeathScreen(this.player.coins, this.player.totalKills, `Killed by ${killerName}`);
+                this.uiManager.showDeathScreen(this.player.coins, this.player.enemiesKilled, `Killed by ${killerName}`);
+            };
+
+            this.networkManager.onRespawnCallback = () => {
+                this.uiManager.hideDeathScreen();
             };
         } catch (error) {
             console.error('Failed to connect to PvP server:', error);

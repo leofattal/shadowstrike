@@ -145,6 +145,12 @@ export class UIManager {
     }
 
     hideDeathScreen() {
+        // Clear any active countdown interval
+        if (this.currentCountdownInterval) {
+            clearInterval(this.currentCountdownInterval);
+            this.currentCountdownInterval = null;
+        }
+
         this.deathScreen.style.display = 'none';
     }
 
