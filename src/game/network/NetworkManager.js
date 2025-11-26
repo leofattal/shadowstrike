@@ -257,11 +257,11 @@ export class NetworkManager {
             // Adjust these values based on the model's actual size
             const modelRoot = loadedMeshes[0];
             modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
-            modelRoot.position.y = 0; // Reset Y position
-            // Try rotation on Z axis to stand up
-            modelRoot.rotation.x = 0;
+            modelRoot.position.y = -0.9; // Position at feet level
+            // Try combined rotations - X and Y together
+            modelRoot.rotation.x = Math.PI / 2; // 90 degrees on X
             modelRoot.rotation.y = 0;
-            modelRoot.rotation.z = Math.PI / 2; // 90 degrees on Z axis
+            modelRoot.rotation.z = Math.PI; // 180 degrees on Z to flip
 
             // Apply player color to the model
             const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);
