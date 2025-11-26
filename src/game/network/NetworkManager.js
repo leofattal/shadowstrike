@@ -257,11 +257,11 @@ export class NetworkManager {
             // Adjust these values based on the model's actual size
             const modelRoot = loadedMeshes[0];
             modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
-            modelRoot.position.y = 0; // Reset Y position
-            // Try no rotation first - let's see the default orientation
+            modelRoot.position.y = -0.9; // Position at feet level
+            // GLTF models often export lying down - rotate Z first, then adjust Y
             modelRoot.rotation.x = 0;
-            modelRoot.rotation.y = Math.PI / 2; // Try 90 degrees on Y only
-            modelRoot.rotation.z = 0;
+            modelRoot.rotation.y = 0;
+            modelRoot.rotation.z = -Math.PI / 2; // -90 degrees on Z to stand up
 
             // Apply player color to the model
             const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);
