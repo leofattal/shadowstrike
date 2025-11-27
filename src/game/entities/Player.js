@@ -1,4 +1,5 @@
 import * as BABYLON from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
 import { WeaponTypes, WeaponUpgrades } from '../weapons/WeaponTypes.js';
 
 export class Player {
@@ -62,6 +63,10 @@ export class Player {
         this.mesh = null;
         this.camera = null;
         this.shootRay = null;
+
+        // Weapon models
+        this.currentWeaponModel = null;
+        this.weaponModels = {}; // Cache of loaded weapon models
 
         // Callbacks
         this.onEnemyKilled = null;
@@ -156,6 +161,74 @@ export class Player {
                 volume: 1.0
             }
         );
+
+        // Load initial weapon model
+        this.loadWeaponModel(this.currentWeapon);
+    }
+
+    async loadWeaponModel(weaponKey) {
+        // Hide current weapon model if exists
+        if (this.currentWeaponModel) {
+            this.currentWeaponModel.setEnabled(false);
+        }
+
+        // Check if we already loaded this weapon
+        if (this.weaponModels[weaponKey]) {
+            this.currentWeaponModel = this.weaponModels[weaponKey];
+            this.currentWeaponModel.setEnabled(true);
+            console.log(`Switched to cached weapon model: ${weaponKey}`);
+            return;
+        }
+
+        // Map weapon keys to folder names
+        const weaponFolderMap = {
+            'PISTOL': 'pistol',
+            'SNIPER_RIFLE': 'sniper',
+            'ASSAULT_RIFLE': 'assault_rifle',
+            'MINIGUN': 'minigun',
+            'KNIFE': null // No model for knife (melee)
+        };
+
+        const folderName = weaponFolderMap[weaponKey];
+        if (!folderName) {
+            console.log(`No 3D model for ${weaponKey}`);
+            return;
+        }
+
+        try {
+            console.log(`Loading weapon model: /weapons/${folderName}/scene.gltf`);
+            const result = await BABYLON.SceneLoader.ImportMeshAsync(
+                '',
+                `/weapons/${folderName}/`,
+                'scene.gltf',
+                this.scene
+            );
+
+            // Create a parent node for the weapon
+            const weaponRoot = new BABYLON.TransformNode(`weapon_${weaponKey}`, this.scene);
+            weaponRoot.parent = this.camera;
+
+            // Attach all loaded meshes to the weapon root
+            result.meshes.forEach(mesh => {
+                if (mesh !== result.meshes[0]) { // Skip root mesh
+                    mesh.parent = weaponRoot;
+                }
+            });
+
+            // Position and scale weapon for first-person view
+            // These values will need tweaking per weapon
+            weaponRoot.position = new BABYLON.Vector3(0.3, -0.3, 0.6);
+            weaponRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0);
+            weaponRoot.scaling = new BABYLON.Vector3(0.5, 0.5, 0.5);
+
+            // Store in cache
+            this.weaponModels[weaponKey] = weaponRoot;
+            this.currentWeaponModel = weaponRoot;
+
+            console.log(`Weapon model loaded: ${weaponKey}`);
+        } catch (error) {
+            console.error(`Failed to load weapon model for ${weaponKey}:`, error);
+        }
     }
 
     update(deltaTime) {
@@ -1085,6 +1158,9 @@ export class Player {
         // Reload ammo for new weapon
         this.currentAmmo = this.weaponStats.maxAmmo;
         this.reserveAmmo = this.weaponStats.reserveAmmo;
+
+        // Load weapon model
+        this.loadWeaponModel(weaponKey);
 
         console.log(`Switched to ${this.weaponStats.name}`);
     }
