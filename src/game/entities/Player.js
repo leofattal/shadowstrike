@@ -162,11 +162,18 @@ export class Player {
             }
         );
 
-        // Load initial weapon model
-        this.loadWeaponModel(this.currentWeapon);
+        // Load initial weapon model after camera is ready
+        setTimeout(() => {
+            this.loadWeaponModel(this.currentWeapon);
+        }, 100);
     }
 
     async loadWeaponModel(weaponKey) {
+        // Safety check - camera must exist
+        if (!this.camera) {
+            console.log('Camera not ready yet, skipping weapon model load');
+            return;
+        }
         // Hide current weapon model if exists
         if (this.currentWeaponModel) {
             this.currentWeaponModel.setEnabled(false);
@@ -225,9 +232,10 @@ export class Player {
             this.weaponModels[weaponKey] = weaponRoot;
             this.currentWeaponModel = weaponRoot;
 
-            console.log(`Weapon model loaded: ${weaponKey}`);
+            console.log(`Weapon model loaded successfully: ${weaponKey}`);
         } catch (error) {
-            console.error(`Failed to load weapon model for ${weaponKey}:`, error);
+            console.warn(`Could not load weapon model for ${weaponKey} - continuing without it:`, error.message);
+            // Game continues without weapon model - this is optional visual enhancement
         }
     }
 
