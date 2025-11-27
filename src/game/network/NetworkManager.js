@@ -238,106 +238,39 @@ export class NetworkManager {
         };
         this.remotePlayers.set(playerData.id, remotePlayerData);
 
-        // Load the low poly person model
-        try {
-            const result = await BABYLON.SceneLoader.ImportMeshAsync(
-                '',
-                '/models/',
-                'scene.gltf',
-                this.scene
-            );
+        // Use simple capsule for player body (model rotation issues - will fix later)
+        const body = BABYLON.MeshBuilder.CreateCapsule('playerBody_' + playerData.id, {
+            radius: 0.3,
+            height: 1.8
+        }, this.scene);
+        body.position.y = 0.9;
+        body.parent = mesh;
 
-            // Parent all loaded meshes to our container
-            const loadedMeshes = result.meshes;
-            loadedMeshes.forEach(loadedMesh => {
-                loadedMesh.parent = mesh;
-            });
+        const bodyMat = new BABYLON.StandardMaterial('bodyMat_' + playerData.id, this.scene);
+        bodyMat.diffuseColor = new BABYLON.Color3(
+            playerData.color.r,
+            playerData.color.g,
+            playerData.color.b
+        );
+        body.material = bodyMat;
 
-            // Scale, rotate and position the model appropriately
-            // Adjust these values based on the model's actual size
-            const modelRoot = loadedMeshes[0];
-            modelRoot.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
-            modelRoot.position.y = 0; // Reset Y position
-            // Try X rotation to stand model upright
-            modelRoot.rotation.x = -Math.PI / 2; // -90 degrees on X to stand up
-            modelRoot.rotation.y = 0;
-            modelRoot.rotation.z = 0;
+        body.isRemotePlayer = true;
+        body.remotePlayerId = playerData.id;
+        body.isHeadshot = false;
 
-            // Apply player color to the model
-            const colorMat = new BABYLON.StandardMaterial('playerColorMat_' + playerData.id, this.scene);
-            colorMat.diffuseColor = new BABYLON.Color3(
-                playerData.color.r,
-                playerData.color.g,
-                playerData.color.b
-            );
+        // Create headshot hitbox
+        const headHitbox = BABYLON.MeshBuilder.CreateSphere('headHitbox_' + playerData.id, {
+            diameter: 0.4
+        }, this.scene);
+        headHitbox.position.y = 1.7;
+        headHitbox.parent = mesh;
+        headHitbox.isVisible = false;
+        headHitbox.isRemotePlayer = true;
+        headHitbox.remotePlayerId = playerData.id;
+        headHitbox.isHeadshot = true;
 
-            // Apply color to all meshes in the model
-            loadedMeshes.forEach(loadedMesh => {
-                if (loadedMesh.material) {
-                    loadedMesh.material = colorMat;
-                }
-            });
-
-            // Create hitbox for hit detection (invisible)
-            const hitbox = BABYLON.MeshBuilder.CreateBox('hitbox_' + playerData.id, {
-                width: 0.6,
-                height: 1.8,
-                depth: 0.6
-            }, this.scene);
-            hitbox.position.y = 0.9;
-            hitbox.parent = mesh;
-            hitbox.isVisible = false;
-            hitbox.isRemotePlayer = true;
-            hitbox.remotePlayerId = playerData.id;
-            hitbox.isHeadshot = false;
-
-            // Create headshot hitbox
-            const headHitbox = BABYLON.MeshBuilder.CreateSphere('headHitbox_' + playerData.id, {
-                diameter: 0.4
-            }, this.scene);
-            headHitbox.position.y = 1.7;
-            headHitbox.parent = mesh;
-            headHitbox.isVisible = false;
-            headHitbox.isRemotePlayer = true;
-            headHitbox.remotePlayerId = playerData.id;
-            headHitbox.isHeadshot = true;
-
-            // Store parts for hit detection
-            remotePlayerData.parts = [hitbox, headHitbox, ...loadedMeshes];
-            remotePlayerData.modelLoaded = true;
-
-            // Mark all model meshes for hit detection
-            loadedMeshes.forEach(loadedMesh => {
-                loadedMesh.isRemotePlayer = true;
-                loadedMesh.remotePlayerId = playerData.id;
-                loadedMesh.isHeadshot = false;
-            });
-
-        } catch (error) {
-            console.error('Failed to load player model, using fallback:', error);
-            // Fallback to simple capsule if model fails to load
-            const fallbackBody = BABYLON.MeshBuilder.CreateCapsule('fallbackBody', {
-                radius: 0.3,
-                height: 1.8
-            }, this.scene);
-            fallbackBody.position.y = 0.9;
-            fallbackBody.parent = mesh;
-
-            const fallbackMat = new BABYLON.StandardMaterial('fallbackMat', this.scene);
-            fallbackMat.diffuseColor = new BABYLON.Color3(
-                playerData.color.r,
-                playerData.color.g,
-                playerData.color.b
-            );
-            fallbackBody.material = fallbackMat;
-
-            fallbackBody.isRemotePlayer = true;
-            fallbackBody.remotePlayerId = playerData.id;
-            fallbackBody.isHeadshot = false;
-
-            remotePlayerData.parts = [fallbackBody];
-            remotePlayerData.modelLoaded = true;
-        }
+        remotePlayerData.parts = [body, headHitbox];
+        remotePlayerData.modelLoaded = true;
 
         // Username label
         const plane = BABYLON.MeshBuilder.CreatePlane('nameLabel', {
