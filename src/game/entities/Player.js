@@ -162,47 +162,50 @@ export class Player {
             }
         );
 
-        // Load initial weapon model after camera is ready
+        // Load initial weapon model after camera is ready (non-blocking)
         setTimeout(() => {
-            this.loadWeaponModel(this.currentWeapon);
-        }, 100);
+            this.loadWeaponModel(this.currentWeapon).catch(err => {
+                console.warn('Weapon model loading failed:', err);
+            });
+        }, 500);
     }
 
     async loadWeaponModel(weaponKey) {
-        // Safety check - camera must exist
-        if (!this.camera) {
-            console.log('Camera not ready yet, skipping weapon model load');
-            return;
-        }
-        // Hide current weapon model if exists
-        if (this.currentWeaponModel) {
-            this.currentWeaponModel.setEnabled(false);
-        }
-
-        // Check if we already loaded this weapon
-        if (this.weaponModels[weaponKey]) {
-            this.currentWeaponModel = this.weaponModels[weaponKey];
-            this.currentWeaponModel.setEnabled(true);
-            console.log(`Switched to cached weapon model: ${weaponKey}`);
-            return;
-        }
-
-        // Map weapon keys to folder names
-        const weaponFolderMap = {
-            'PISTOL': 'pistol',
-            'SNIPER_RIFLE': 'sniper',
-            'ASSAULT_RIFLE': 'assault_rifle',
-            'MINIGUN': 'minigun',
-            'KNIFE': null // No model for knife (melee)
-        };
-
-        const folderName = weaponFolderMap[weaponKey];
-        if (!folderName) {
-            console.log(`No 3D model for ${weaponKey}`);
-            return;
-        }
-
         try {
+            // Safety check - camera must exist
+            if (!this.camera) {
+                console.log('Camera not ready yet, skipping weapon model load');
+                return;
+            }
+
+            // Hide current weapon model if exists
+            if (this.currentWeaponModel) {
+                this.currentWeaponModel.setEnabled(false);
+            }
+
+            // Check if we already loaded this weapon
+            if (this.weaponModels[weaponKey]) {
+                this.currentWeaponModel = this.weaponModels[weaponKey];
+                this.currentWeaponModel.setEnabled(true);
+                console.log(`Switched to cached weapon model: ${weaponKey}`);
+                return;
+            }
+
+            // Map weapon keys to folder names
+            const weaponFolderMap = {
+                'PISTOL': 'pistol',
+                'SNIPER_RIFLE': 'sniper',
+                'ASSAULT_RIFLE': 'assault_rifle',
+                'MINIGUN': 'minigun',
+                'KNIFE': null // No model for knife (melee)
+            };
+
+            const folderName = weaponFolderMap[weaponKey];
+            if (!folderName) {
+                console.log(`No 3D model for ${weaponKey}`);
+                return;
+            }
+
             console.log(`Loading weapon model: /weapons/${folderName}/scene.gltf`);
             const result = await BABYLON.SceneLoader.ImportMeshAsync(
                 '',
@@ -234,7 +237,7 @@ export class Player {
 
             console.log(`Weapon model loaded successfully: ${weaponKey}`);
         } catch (error) {
-            console.warn(`Could not load weapon model for ${weaponKey} - continuing without it:`, error.message);
+            console.warn(`Could not load weapon model for ${weaponKey} - continuing without it:`, error);
             // Game continues without weapon model - this is optional visual enhancement
         }
     }
