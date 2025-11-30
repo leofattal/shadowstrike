@@ -302,8 +302,8 @@ export class LevelManager {
         ladderTrigger.checkCollisions = false;
         ladderTrigger.isVisible = false;
 
-        // Store tower position for player spawn
-        this.towerSpawnPosition = new BABYLON.Vector3(towerPosition.x, towerHeight + 2, towerPosition.z);
+        // Store tower position for player spawn (higher up to avoid being stuck)
+        this.towerSpawnPosition = new BABYLON.Vector3(towerPosition.x, towerHeight + 5, towerPosition.z);
     }
 
     // Helper method to create a climbable ladder
