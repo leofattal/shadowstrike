@@ -19,9 +19,10 @@
   "author": "Game Dev Team",
   "license": "MIT",
   "dependencies": {
-    "@babylonjs/core": "^6.0.0",
-    "@babylonjs/loaders": "^6.0.0",
+    "@babylonjs/core": "^6.49.0",
+    "@babylonjs/loaders": "^6.49.0",
     "@babylonjs/materials": "^6.0.0",
+    "@lumaai/luma-web": "^0.2.2",
     "cannon": "^0.6.2",
     "express": "^5.1.0",
     "socket.io": "^4.8.1",

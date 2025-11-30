@@ -5,6 +5,8 @@ import { UIManager } from './ui/UIManager.js';
 import { Shop } from './ui/Shop.js';
 import { LevelManager } from './level/LevelManager.js';
 import { NetworkManager } from './network/NetworkManager.js';
+import { GaussianSplatLoader } from './rendering/GaussianSplatLoader.js';
+import { SplatDropZone } from '../ui/SplatDropZone.js';
 
 export class Game {
     constructor(canvas) {
@@ -17,6 +19,8 @@ export class Game {
         this.shop = null;
         this.levelManager = null;
         this.networkManager = null;
+        this.gaussianSplatLoader = null;
+        this.splatDropZone = null;
         this.isRunning = false;
         this.spawnPosition = null;
     }
@@ -96,6 +100,20 @@ export class Game {
 
         // Update UI - no AI enemies, just player count
         this.uiManager.updateEnemyCount(0, 0);
+
+        // Initialize Gaussian Splat system
+        this.gaussianSplatLoader = new GaussianSplatLoader(this.scene);
+        this.splatDropZone = new SplatDropZone(async (file) => {
+            return await this.gaussianSplatLoader.loadFromFile(file);
+        });
+        this.splatDropZone.init();
+
+        // Set up clear callback
+        this.splatDropZone.onClear(() => {
+            this.gaussianSplatLoader.clear();
+        });
+
+        console.log('🎯 Gaussian Splat system ready! Drag and drop a .ply file to load your battlefield.');
 
         // Lock pointer on click
         this.canvas.addEventListener('click', async () => {
