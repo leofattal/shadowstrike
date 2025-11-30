@@ -12,6 +12,8 @@ export class SplatDropZone {
      * Initialize the drop zone UI
      */
     init() {
+        console.log('🎯 Initializing Gaussian Splat drop zone...');
+
         // Create drop zone overlay
         this.dropZone = document.createElement('div');
         this.dropZone.id = 'splatDropZone';
@@ -20,7 +22,9 @@ export class SplatDropZone {
                 <div class="drop-icon">📁</div>
                 <h2>Drop Gaussian Splat (.ply) File</h2>
                 <p>Drag and drop a .ply file to use as your battlefield</p>
+                <p style="font-size: 12px; color: #888; margin-top: 10px;">Or click anywhere to browse files</p>
                 <button id="clearSplatBtn" style="display: none;">Clear Splat</button>
+                <input type="file" id="splatFileInput" accept=".ply" style="display: none;">
             </div>
         `;
 
@@ -112,6 +116,74 @@ export class SplatDropZone {
             e.stopPropagation();
             this.clearSplat();
         });
+
+        // File input for clicking to browse
+        const fileInput = document.getElementById('splatFileInput');
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file && file.name.toLowerCase().endsWith('.ply')) {
+                this.hide();
+                this.showLoadingIndicator();
+                const success = await this.onFileDropped(file);
+                this.hideLoadingIndicator();
+                if (success) {
+                    document.getElementById('clearSplatBtn').style.display = 'block';
+                } else {
+                    alert('Failed to load Gaussian Splat file. Please check the console for errors.');
+                }
+            }
+        });
+
+        // Click drop zone content to open file picker
+        const dropZoneContent = this.dropZone.querySelector('.drop-zone-content');
+        dropZoneContent.addEventListener('click', (e) => {
+            if (e.target !== clearBtn) {
+                fileInput.click();
+            }
+        });
+
+        // Create a visible load button in the UI
+        this.createLoadButton();
+
+        console.log('✅ Gaussian Splat drop zone initialized!');
+    }
+
+    /**
+     * Create a visible button to load splat files
+     */
+    createLoadButton() {
+        const loadBtn = document.createElement('button');
+        loadBtn.id = 'loadSplatBtn';
+        loadBtn.textContent = '📁 Load .ply Splat';
+        loadBtn.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1000;
+            transition: all 0.3s;
+        `;
+
+        loadBtn.addEventListener('mouseenter', () => {
+            loadBtn.style.background = 'rgba(0, 255, 0, 0.4)';
+        });
+
+        loadBtn.addEventListener('mouseleave', () => {
+            loadBtn.style.background = 'rgba(0, 255, 0, 0.2)';
+        });
+
+        loadBtn.addEventListener('click', () => {
+            this.show();
+        });
+
+        document.body.appendChild(loadBtn);
     }
 
     /**
