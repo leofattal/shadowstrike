@@ -163,11 +163,12 @@ export class Player {
         );
 
         // Load initial weapon model after camera is ready (non-blocking)
-        setTimeout(() => {
-            this.loadWeaponModel(this.currentWeapon).catch(err => {
-                console.warn('Weapon model loading failed:', err);
-            });
-        }, 500);
+        // Temporarily disabled to prevent loading issues
+        // setTimeout(() => {
+        //     this.loadWeaponModel(this.currentWeapon).catch(err => {
+        //         console.warn('Weapon model loading failed:', err);
+        //     });
+        // }, 500);
     }
 
     async loadWeaponModel(weaponKey) {
@@ -1170,8 +1171,8 @@ export class Player {
         this.currentAmmo = this.weaponStats.maxAmmo;
         this.reserveAmmo = this.weaponStats.reserveAmmo;
 
-        // Load weapon model
-        this.loadWeaponModel(weaponKey);
+        // Load weapon model (temporarily disabled)
+        // this.loadWeaponModel(weaponKey);
 
         console.log(`Switched to ${this.weaponStats.name}`);
     }
