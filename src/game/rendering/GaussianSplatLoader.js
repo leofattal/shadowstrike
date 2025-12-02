@@ -153,18 +153,18 @@ export class GaussianSplatLoader {
         mesh.name = 'gaussianSplatMesh';
         mesh.checkCollisions = true;
 
-        // Create material for point cloud
+        // Create material for point cloud with much larger points
         const material = new BABYLON.StandardMaterial('splatMaterial', this.scene);
         material.emissiveColor = new BABYLON.Color3(1, 1, 1);
         material.disableLighting = true;
         material.pointsCloud = true;
-        material.pointSize = 5;
+        material.pointSize = 20; // Much larger points to fill gaps
         mesh.material = material;
 
         this.pointCloud = pointCloud;
         this.splatMesh = mesh;
 
-        console.log('Gaussian Splat loaded successfully!');
+        console.log('Gaussian Splat loaded successfully! Use +/- keys to adjust point size.');
     }
 
     /**
@@ -187,6 +187,42 @@ export class GaussianSplatLoader {
     setPointSize(size) {
         if (this.splatMesh && this.splatMesh.material) {
             this.splatMesh.material.pointSize = size;
+            console.log(`Point size: ${size}`);
         }
+    }
+
+    /**
+     * Hide original level geometry to show only the splat
+     */
+    hideOriginalLevel() {
+        console.log('Hiding original level geometry...');
+
+        // Hide all meshes except the splat and player
+        this.scene.meshes.forEach(mesh => {
+            if (mesh.name !== 'gaussianSplatMesh' &&
+                mesh.name !== 'player' &&
+                !mesh.name.startsWith('playerCamera') &&
+                !mesh.name.startsWith('weapon_') &&
+                !mesh.name.startsWith('playerBody')) {
+                mesh.isVisible = false;
+            }
+        });
+
+        console.log('✅ Original level hidden');
+    }
+
+    /**
+     * Show original level geometry
+     */
+    showOriginalLevel() {
+        console.log('Showing original level geometry...');
+
+        this.scene.meshes.forEach(mesh => {
+            if (mesh.name !== 'gaussianSplatMesh') {
+                mesh.isVisible = true;
+            }
+        });
+
+        console.log('✅ Original level visible');
     }
 }

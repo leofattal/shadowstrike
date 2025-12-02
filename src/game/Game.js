@@ -104,16 +104,44 @@ export class Game {
         // Initialize Gaussian Splat system
         this.gaussianSplatLoader = new GaussianSplatLoader(this.scene);
         this.splatDropZone = new SplatDropZone(async (file) => {
-            return await this.gaussianSplatLoader.loadFromFile(file);
+            const success = await this.gaussianSplatLoader.loadFromFile(file);
+            if (success) {
+                // Hide original level when splat is loaded
+                this.gaussianSplatLoader.hideOriginalLevel();
+            }
+            return success;
         });
         this.splatDropZone.init();
 
         // Set up clear callback
         this.splatDropZone.onClear(() => {
             this.gaussianSplatLoader.clear();
+            this.gaussianSplatLoader.showOriginalLevel();
         });
 
-        console.log('🎯 Gaussian Splat system ready! Drag and drop a .ply file to load your battlefield.');
+        // Keyboard controls for point size adjustment
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '=' || e.key === '+') {
+                const currentSize = this.gaussianSplatLoader.splatMesh?.material?.pointSize || 20;
+                this.gaussianSplatLoader.setPointSize(currentSize + 5);
+            } else if (e.key === '-' || e.key === '_') {
+                const currentSize = this.gaussianSplatLoader.splatMesh?.material?.pointSize || 20;
+                this.gaussianSplatLoader.setPointSize(Math.max(1, currentSize - 5));
+            } else if (e.key === 'h' || e.key === 'H') {
+                // Toggle original level visibility
+                const firstMesh = this.scene.meshes.find(m => m.name === 'ground');
+                if (firstMesh && firstMesh.isVisible) {
+                    this.gaussianSplatLoader.hideOriginalLevel();
+                } else {
+                    this.gaussianSplatLoader.showOriginalLevel();
+                }
+            }
+        });
+
+        console.log('🎯 Gaussian Splat system ready!');
+        console.log('   • Drag and drop .ply files');
+        console.log('   • Press +/- to adjust point size');
+        console.log('   • Press H to toggle original level');
 
         // Lock pointer on click
         this.canvas.addEventListener('click', async () => {
